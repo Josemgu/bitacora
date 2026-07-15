@@ -1,0 +1,91 @@
+nt (pero no todos done)
+     * - '':        ninguno tiene avance
+     * @param {Array} phaseTopics — topics de la fase
+     * @returns {string} 'done' | 'current' | ''
+     * @private
+     */
+    function _getPhaseState(phaseTopics) {
+        if (!phaseTopics.length) return '';
+
+        var allDone = phaseTopics.every(function (t) { return t.status === 'done'; });
+        if (allDone) return 'done';
+
+        var hasProgress = phaseTopics.some(function (t) {
+            return t.status === 'done' || t.status === 'current';
+        });
+        if (hasProgress) return 'current';
+
+        return '';
+    }
+
+    /**
+     * Formatea el rango de fechas de una fase para mostrar.
+     * @param {Object} phase — objeto fase
+     * @returns {string} etiqueta de fecha
+     * @private
+     */
+    function _formatWhen(phase) {
+        if (!phase.starts_on) return '';
+
+        var start = _parseDate(phase.starts_on);
+        var end = phase.ends_on ? _parseDate(phase.ends_on) : null;
+
+        var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+        var startStr = months[start.getMonth()] + ' ' + start.getFullYear();
+
+        if (end) {
+            var endStr = months[end.getMonth()] + ' ' + end.getFullYear();
+            if (startStr !== endStr) {
+                return startStr + ' \u2013 ' + endStr;
+            }
+        }
+        return startStr;
+    }
+
+    /**
+     * Parsea una fecha ISO a objeto Date.
+     * @param {string} isoStr — fecha en formato ISO
+     * @returns {Date}
+     * @private
+     */
+    function _parseDate(isoStr) {
+        // Manejar tanto ISO como YYYY-MM-DD
+        if (isoStr.indexOf('T') !== -1) {
+            return new Date(isoStr);
+        }
+        // Para YYYY-MM-DD sin componente de tiempo, parsear como local
+        var parts = isoStr.split('-');
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+
+    /**
+     * Escapa caracteres HTML especiales.
+     * @param {string} text — texto a escapar
+     * @returns {string} texto escapado
+     * @private
+     */
+    function _esc(text) {
+        if (typeof text !== 'string') return String(text || '');
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       API PUBLICA
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    return {
+        init: init,
+        render: render,
+        toggleNode: toggleNode,
+        cycleTopic: cycleTopic,
+        calculateProgress: calculateProgress,
+        refreshStrip: refreshStrip,
+        refreshSpine: refreshSpine,
+        updateNodeState: updateNodeState
+    };
+
+})();
