@@ -1,0 +1,434 @@
+     <span class="stat-value">38%</span>
+            <span class="stat-label">Fase actual</span>
+          </div>
+          <div class="stat">
+            <svg class="ico stat-ico"><use href="#i-youtube"></use></svg>
+            <span class="stat-value">67</span>
+            <span class="stat-label">Videos vistos</span>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Fase actual</h2>
+              <span class="tag tag-green">Nov 2026 – Mar 2027</span>
+            </div>
+            <div class="panel-body">
+              <p class="panel-topic">Hardening de Linux + segmentación con VLANs</p>
+              <div class="bar"><div class="bar-fill" style="width:38%"></div></div>
+              <ul class="topic-list">
+                <li class="topic done">CIS Benchmark aplicado manualmente</li>
+                <li class="topic done">SSH solo por llave, password auth off</li>
+                <li class="topic current">rsyslog centralizado</li>
+                <li class="topic todo">Backups con restore verificado</li>
+                <li class="topic todo">Reglas de firewall inter-VLAN en pfSense</li>
+                <li class="topic todo">Wireshark entre VLANs</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Esta semana</h2>
+              <span class="tag">Semana 12</span>
+            </div>
+            <div class="panel-body">
+              <ul class="week-list">
+                <li class="wk done"><span class="wk-day">LUN</span><span class="wk-topic">Linux / Sistemas</span><i class="dot dot-green"></i></li>
+                <li class="wk done"><span class="wk-day">MAR</span><span class="wk-topic">Networking</span><i class="dot dot-green"></i></li>
+                <li class="wk today"><span class="wk-day">MIÉ</span><span class="wk-topic">Cloud</span><i class="dot dot-yellow"></i></li>
+                <li class="wk"><span class="wk-day">JUE</span><span class="wk-topic">Security</span><i class="dot dot-gray"></i></li>
+                <li class="wk"><span class="wk-day">VIE</span><span class="wk-topic">Inglés + documentación</span><i class="dot dot-gray"></i></li>
+                <li class="wk"><span class="wk-day">SÁB</span><span class="wk-topic">Laboratorio profundo</span><i class="dot dot-gray"></i></li>
+                <li class="wk"><span class="wk-day">DOM</span><span class="wk-topic">Proyecto + bitácora</span><i class="dot dot-gray"></i></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Acciones rápidas</h2></div>
+          <div class="panel-body">
+            <div class="quick-grid">
+              <a class="quick" href="#chat">
+                <svg class="ico"><use href="#i-ia"></use></svg>
+                <strong>Consulta algo</strong>
+                <span>Pregunta al asistente sobre lo que estás estudiando</span>
+              </a>
+              <a class="quick" href="#mesa">
+                <svg class="ico"><use href="#i-mesa"></use></svg>
+                <strong>Dibuja un diagrama</strong>
+                <span>Arma la topología de tu homelab en el canvas</span>
+              </a>
+              <a class="quick" href="#recursos">
+                <svg class="ico"><use href="#i-busqueda"></use></svg>
+                <strong>Busca recursos</strong>
+                <span>43 enlaces filtrados por fase y categoría</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: ROADMAP ─────── -->
+    <section class="view" id="view-roadmap">
+      <div class="view-bar">
+        <span class="crumb">roadmap</span>
+        <span class="view-bar-meta">8 fases · 28 temas · 2 certificaciones</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Octubre 2026 → Octubre 2029</h1>
+          <p>Cada fase alimenta a la siguiente. Lo que construyes en la Fase 1 es lo que monitorea la Fase 5.</p>
+        </div>
+
+        <div class="phase-strip">
+          <div class="strip-item" style="--accent:#3fb950"><span>F0</span><div class="bar"><div class="bar-fill" style="width:100%"></div></div></div>
+          <div class="strip-item" style="--accent:#3fb950"><span>F1</span><div class="bar"><div class="bar-fill" style="width:38%"></div></div></div>
+          <div class="strip-item" style="--accent:#58a6ff"><span>F2</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#a371f7"><span>F3</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#d29922"><span>F4</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#f85149"><span>F5</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#39c5cf"><span>F6</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#8b949e"><span>F7</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+        </div>
+
+        <div class="spine">
+          <div class="spine-track"><div class="spine-fill"></div></div>
+          <div class="spine-nodes">
+
+            <article class="node state-done" style="--accent:#3fb950">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 0</span>
+                  <span class="node-when">Oct 2026</span>
+                </div>
+                <h3>Base del homelab</h3>
+                <p>Proxmox + pfSense/OPNsense como VM desde el día 1. Las 4 VLANs existen aunque estén vacías.</p>
+                <ul class="topic-list">
+                  <li class="topic done">Hypervisor y topología base</li>
+                  <li class="topic done">pfSense/OPNsense perimetral</li>
+                  <li class="topic done">VLANs: Management, Servers, Users, DMZ</li>
+                  <li class="topic done">Repo GitHub + primer post en LinkedIn</li>
+                </ul>
+                <div class="tag-row"><span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>homelab-cloud-security</span></div>
+              </div>
+            </article>
+
+            <article class="node state-current" style="--accent:#3fb950">
+              <div class="node-dot"><i class="pulse"></i></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 1</span>
+                  <span class="node-when">Nov 2026 – Mar 2027</span>
+                </div>
+                <h3>Linux + Networking real</h3>
+                <p>Hardening real de Ubuntu y las 4 VLANs implementadas de verdad en pfSense — reglas aplicadas, no un diagrama.</p>
+                <ul class="topic-list">
+                  <li class="topic done">CIS Benchmark + SSH solo por llave</li>
+                  <li class="topic current">rsyslog centralizado</li>
+                  <li class="topic todo">Backups probados con restore real</li>
+                  <li class="topic todo">Reglas de firewall inter-VLAN</li>
+                  <li class="topic todo">Wireshark: tráfico entre VLANs</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>linux-hardened-server</span>
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>homelab-network-segmentation</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#58a6ff">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 2</span>
+                  <span class="node-when">Abr 2027 – Ago 2027</span>
+                </div>
+                <h3>Windows Server + Ofensiva básica</h3>
+                <p>AD ficticio "Ortiz Technologies" con 100 usuarios, y un ataque simulado contra tu propio dominio.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">Dominio con OUs por departamento</li>
+                  <li class="topic todo">GPOs: LAPS, SMBv1 off, PowerShell restringido</li>
+                  <li class="topic todo">ADCS interna + servidor de archivos con DFS</li>
+                  <li class="topic todo">Kerberoasting / AS-REP Roasting documentado</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>ad-lab-attack-detection</span>
+                  <span class="tag tag-cert">CompTIA Security+</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#a371f7">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 3</span>
+                  <span class="node-when">Sep 2027 – Feb 2028</span>
+                </div>
+                <h3>AWS + Infraestructura como código</h3>
+                <p>Multi-cuenta con Organizations, IAM de mínimo privilegio, Terraform con state remoto y pipeline real.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">AWS Organizations: cuentas dev/prod</li>
+                  <li class="topic todo">VPC, subnets, NAT, Security Groups, NACLs</li>
+                  <li class="topic todo">State remoto: S3 + DynamoDB locking</li>
+                  <li class="topic todo">GitHub Actions: plan en PR, apply en merge</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>aws-infra-as-code</span>
+                  <span class="tag tag-cert">AWS Solutions Architect Associate</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#d29922">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 4</span>
+                  <span class="node-when">Mar 2028 – Ago 2028</span>
+                </div>
+                <h3>Docker + Kubernetes con carga real</h3>
+                <p>Cluster de 1 master + 2 workers sobre Proxmox, desplegando el stack que usará la Fase 5.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">Cluster K8s real en el homelab</li>
+                  <li class="topic todo">GitOps con ArgoCD</li>
+                  <li class="topic todo">Trivy escaneando imágenes en el pipeline</li>
+                </ul>
+                <div class="tag-row"><span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>k8s-homelab-platform</span></div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#f85149">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 5</span>
+                  <span class="node-when">Sep 2028 – Feb 2029</span>
+                </div>
+                <h3>SOC casero + AWS Security avanzado</h3>
+                <p>Wazuh + Suricata + Grafana ingiriendo todos los logs. Ejercicio purple team contra tu propio homelab.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">SOC completo, no herramientas sueltas</li>
+                  <li class="topic todo">Cadena de ataque completa + detección</li>
+                  <li class="topic todo">GuardDuty, Security Hub, Config, alertas SNS</li>
+                  <li class="topic todo">Reporte de incidente publicado</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>homelab-soc</span>
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>incident-report</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#39c5cf">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 6</span>
+                  <span class="node-when">Mar 2029 – Jun 2029</span>
+                </div>
+                <h3>IA aplicada a seguridad</h3>
+                <p>RAG local que ingiere las alertas reales de tu propio Wazuh — no un dataset genérico de ejemplo.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">AI SOC Assistant: Ollama + vector DB</li>
+                  <li class="topic todo">AI Cloud Assistant: revisión de Terraform</li>
+                  <li class="topic todo">AI Homelab Assistant</li>
+                </ul>
+                <div class="tag-row"><span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>ai-soc-assistant</span></div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#8b949e">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 7</span>
+                  <span class="node-when">Jul 2029 – Oct 2029</span>
+                </div>
+                <h3>Preparación de búsqueda de empleo</h3>
+                <p>No se construye portafolio desde cero — se pule lo documentado desde la Fase 0.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">8–12 repos ya documentados</li>
+                  <li class="topic todo">CV en formato canadiense</li>
+                  <li class="topic todo">Simulacros: explicar arquitectura, no teoría</li>
+                </ul>
+              </div>
+            </article>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: RECURSOS ─────── -->
+    <section class="view" id="view-recursos">
+      <div class="view-bar">
+        <span class="crumb">recursos</span>
+        <span class="view-bar-meta">43 recursos · 9 fases</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Recursos</h1>
+          <p>Todo lo que alimenta cada fase, filtrado por categoría y momento del roadmap.</p>
+        </div>
+
+        <div class="filter-bar">
+          <div class="search-field">
+            <svg class="ico"><use href="#i-busqueda"></use></svg>
+            <input type="text" placeholder="Buscar por título o descripción…">
+          </div>
+          <div class="chip-row">
+            <button class="chip is-on">Todos</button>
+            <button class="chip">YouTube</button>
+            <button class="chip">Blog</button>
+            <button class="chip">Docs</button>
+            <button class="chip">Curso</button>
+            <button class="chip">GitHub</button>
+            <button class="chip">Lab</button>
+            <button class="chip">Inglés</button>
+          </div>
+          <div class="chip-row chip-row-phase">
+            <button class="chip chip-sm is-on">F0</button>
+            <button class="chip chip-sm">F1</button>
+            <button class="chip chip-sm">F2</button>
+            <button class="chip chip-sm">F3</button>
+            <button class="chip chip-sm">F4</button>
+            <button class="chip chip-sm">F5</button>
+            <button class="chip chip-sm">F6</button>
+            <button class="chip chip-sm">F7</button>
+            <button class="chip chip-sm">FX</button>
+          </div>
+        </div>
+
+        <div class="res-grid">
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-youtube"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Proxmox VE desde cero</strong>
+            <p>Instalación del hypervisor, creación de VMs y virtual switches.</p>
+            <div class="tag-row"><span class="tag tag-green">F0</span><span class="tag tag-blue">YouTube</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>pfSense Documentation</strong>
+            <p>Referencia oficial de reglas de firewall y configuración de VLANs.</p>
+            <div class="tag-row"><span class="tag tag-green">F0</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>CIS Benchmarks — Ubuntu</strong>
+            <p>Guía de hardening que se aplica manualmente en la Fase 1.</p>
+            <div class="tag-row"><span class="tag tag-green">F1</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-github"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Wireshark Sample Captures</strong>
+            <p>Capturas de ejemplo para practicar análisis de tráfico.</p>
+            <div class="tag-row"><span class="tag tag-green">F1</span><span class="tag tag-blue">GitHub</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-mesa"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>TryHackMe — Active Directory</strong>
+            <p>Laboratorio guiado de enumeración y ataques básicos a AD.</p>
+            <div class="tag-row"><span class="tag tag-green">F2</span><span class="tag tag-blue">Lab</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Terraform Registry — AWS</strong>
+            <p>Documentación del provider y módulos oficiales.</p>
+            <div class="tag-row"><span class="tag tag-green">F3</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-youtube"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Kubernetes the Hard Way</strong>
+            <p>Montar el cluster componente por componente, sin atajos.</p>
+            <div class="tag-row"><span class="tag tag-green">F4</span><span class="tag tag-blue">GitHub</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Wazuh — Documentación</strong>
+            <p>Instalación del manager, agentes y reglas de detección.</p>
+            <div class="tag-row"><span class="tag tag-green">F5</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-ia"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Ollama + RAG local</strong>
+            <p>Base para el AI SOC Assistant de la Fase 6.</p>
+            <div class="tag-row"><span class="tag tag-green">F6</span><span class="tag tag-blue">Blog</span></div>
+          </a>
+        </div>
+
+        <button class="btn btn-ghost btn-block">
+          <svg class="ico"><use href="#i-agregar"></use></svg>
+          Agregar recurso
+        </button>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: HORARIO ─────── -->
+    <section class="view" id="view-horario">
+      <div class="view-bar">
+        <span class="crumb">horario</span>
+        <span class="view-bar-meta">julio 2026</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head-row">
+          <div class="section-head">
+            <h1>Horario</h1>
+            <p>La rutina fija, semana tras semana, durante 36 meses.</p>
+          </div>
+          <div class="seg">
+            <button class="seg-btn is-on">Semana</button>
+            <button class="seg-btn">Mes</button>
+          </div>
+        </div>
+
+        <div class="week-cards">
+          <div class="day" style="--accent:#3fb950"><span class="day-name">LUN</span><strong>Linux / Sistemas</strong><span class="day-note">2h</span></div>
+          <div class="day" style="--accent:#58a6ff"><span class="day-name">MAR</span><strong>Networking</strong><span class="day-note">2h</span></div>
+          <div class="day is-today" style="--accent:#a371f7"><span class="day-name">MIÉ</span><strong>Cloud</strong><span class="day-note">2h</span></div>
+          <div class="day" style="--accent:#f85149"><span class="day-name">JUE</span><strong>Security</strong><span class="day-note">2h</span></div>
+          <div class="day" style="--accent:#d29922"><span class="day-name">VIE</span><strong>Inglés + docs</strong><span class="day-note">2h</span></div>
+          <div class="day is-weekend" style="--accent:#39c5cf"><span class="day-name">SÁB</span><strong>Laboratorio profundo</strong><span class="day-note">6h</span></div>
+          <div class="day is-weekend" style="--accent:#39c5cf"><span class="day-name">DOM</span><strong>Proyecto + bitácora</strong><span class="day-note">6h</span></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Julio 2026</h2>
+           
