@@ -1,0 +1,217 @@
+ics — topics de la fase
+     * @returns {string} HTML de la lista
+     * @private
+     */
+    function _renderTopicsList(phaseTopics) {
+        if (!phaseTopics.length) return '';
+
+        var html = '';
+        phaseTopics.forEach(function (topic) {
+            var topicClass = topic.status; // 'done', 'current', o '' (todo)
+            var sp = Subtopics.getProgress(topic.id);
+            var progressLabel = sp.total > 0 ? ' (' + sp.done + '/' + sp.total + ')' : '';
+            html += '<li class="topic ' + topicClass + '" data-topic-id="' + topic.id + '">' +
+                    '<div class="topic-header">' +
+                    '<span>' + _esc(topic.title) + progressLabel + '</span>' +
+                    '<span class="topic-chevron">&#9662;</span>' +
+                    '</div>' +
+                    '<div class="topic-subtopics" data-topic-subtopics="' + topic.id + '"></div>' +
+                    '</li>';
+        });
+        return html;
+    }
+
+    /**
+     * Renderiza los subtemas para todos los topics de una fase.
+     * Se llama despues de insertar el HTML en el DOM.
+     * @param {Array} phaseTopics — topics de la fase
+     * @private
+     */
+    function _renderSubtopicsForPhase(phaseTopics) {
+        if (typeof Subtopics === 'undefined') return;
+        phaseTopics.forEach(function (topic) {
+            var container = document.querySelector('[data-topic-subtopics="' + topic.id + '"]');
+            if (container) {
+                Subtopics.renderForTopic(topic.id, container);
+            }
+        });
+    }
+
+    /**
+     * Renderiza los tags de proyectos de una fase.
+     * @param {number} phaseId — ID de la fase
+     * @returns {string} HTML de los tags
+     * @private
+     */
+    function _renderPhaseProjects(phaseId) {
+        var projects = DB.query('projects', function (p) { return p.phase_id === phaseId; });
+        if (!projects.length) return '';
+
+        var html = '<div class="tag-row">';
+        projects.forEach(function (project) {
+            var tagClass = project.status === 'done' ? 'tag-repo' : 'tag';
+            if (project.repo_url) {
+                html += '<a href="' + _esc(project.repo_url) + '" target="_blank" class="tag ' + tagClass + '">' +
+                        '<svg class="ico"><use href="#i-github"></use></svg>' +
+                        _esc(project.repo_name) + '</a>';
+            } else {
+                html += '<span class="tag ' + tagClass + '">' +
+                        '<svg class="ico"><use href="#i-github"></use></svg>' +
+                        _esc(project.repo_name) + '</span>';
+            }
+        });
+        html += '</div>';
+        return html;
+    }
+
+    /**
+     * Renderiza la phase-strip con barras de progreso por fase.
+     * @param {Array} phases — lista de fases ordenadas
+     * @param {Array} topics — lista de todos los topics
+     * @private
+     */
+    function _renderPhaseStrip(phases, topics) {
+        if (!_els.phaseStrip) return;
+
+        var progress = calculateProgress();
+        var byPhaseMap = {};
+        progress.byPhase.forEach(function (bp) {
+            byPhaseMap[bp.phaseId] = bp;
+        });
+
+        var html = '';
+        phases.forEach(function (phase) {
+            var bp = byPhaseMap[phase.id];
+            var pct = bp ? bp.percent : 0;
+            html +=
+                '<div class="strip-item" style="--accent:' + phase.accent + '">\n' +
+                '  <span>F' + phase.index + '</span>\n' +
+                '  <div class="bar"><div class="bar-fill" style="width:' + pct + '%"></div></div>\n' +
+                '</div>';
+        });
+
+        _els.phaseStrip.innerHTML = html;
+    }
+
+    /**
+     * Aplica el progreso calculado al DOM: spine-fill y sidebar.
+     * @param {Object} progress — resultado de calculateProgress()
+     * @private
+     */
+    function _applyProgress(progress) {
+        // Spine fill height = progreso global en porcentaje
+        if (_els.spineFill) {
+            _els.spineFill.style.height = progress.global + '%';
+        }
+
+        // Actualizar sidebar via App.updateProgress si existe
+        if (typeof App !== 'undefined' && typeof App.updateProgress === 'function') {
+            App.updateProgress(progress.global);
+        }
+    }
+
+    /**
+     * Expande la fase actual (state-current) y colapsa las demas.
+     * @param {Array} phases — lista de fases
+     * @param {Array} topics — lista de topics
+     * @private
+     */
+    function _setInitialExpansion(phases, topics) {
+        phases.forEach(function (phase) {
+            var phaseTopics = topics.filter(function (t) { return t.phase_id === phase.id; });
+            var phaseState = _getPhaseState(phaseTopics);
+            var nodeCard = _els.spineNodes.querySelector('.node-card[data-phase-id="' + phase.id + '"]');
+            if (!nodeCard) return;
+
+            var topicList = nodeCard.querySelector('.topic-list');
+            if (!topicList) return;
+
+            if (phaseState === 'current') {
+                nodeCard.classList.add('is-expanded');
+                topicList.style.display = '';
+
+                // Expandir el topic 'current' dentro de esta fase
+                phaseTopics.forEach(function (topic) {
+                    if (topic.status === 'current') {
+                        _toggleTopicSubtopics(topic.id);
+                    }
+                });
+            } else {
+                nodeCard.classList.remove('is-expanded');
+                topicList.style.display = 'none';
+            }
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       INTERACCION: TOGGLE NODE
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Expande o colapsa un nodo de fase.
+     * Toggle la visibilidad de .topic-list y la clase .is-expanded en .node-card.
+     * @param {number} phaseId — ID de la fase
+     */
+    function toggleNode(phaseId) {
+        if (!_els.spineNodes) return;
+
+        var nodeCard = _els.spineNodes.querySelector('.node-card[data-phase-id="' + phaseId + '"]');
+        if (!nodeCard) return;
+
+        var topicList = nodeCard.querySelector('.topic-list');
+        if (!topicList) return;
+
+        var isExpanded = nodeCard.classList.contains('is-expanded');
+
+        if (isExpanded) {
+            nodeCard.classList.remove('is-expanded');
+            topicList.style.display = 'none';
+        } else {
+            nodeCard.classList.add('is-expanded');
+            topicList.style.display = '';
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       INTERACCION: CYCLE TOPIC
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Cicla el estado de un tema: todo -> current -> done -> todo.
+     * Al cambiar a 'done' setea completed_at.
+     * Al cambiar a 'current' baja el anterior current a 'todo'.
+     * Recalcula todo en cascada (progreso, estados, UI).
+     * @param {number} topicId — ID del topic
+     */
+    function cycleTopic(topicId) {
+        var topic = DB.getById('topics', topicId);
+        if (!topic) {
+            console.warn('[Roadmap] cycleTopic: topic no encontrado:', topicId);
+            return;
+        }
+
+        var currentStatus = topic.status || 'todo';
+        var newStatus;
+        var changes = {};
+
+        // Maquina de estados: todo -> current -> done -> todo
+        if (currentStatus === 'todo') {
+            newStatus = 'current';
+        } else if (currentStatus === 'current') {
+            newStatus = 'done';
+            changes.completed_at = new Date().toISOString();
+        } else {
+            // done -> todo
+            newStatus = 'todo';
+            changes.completed_at = null;
+        }
+
+        changes.status = newStatus;
+
+        // Si pasa a 'current', bajar el anterior current global a 'todo'
+        if (newStatus === 'current') {
+            _demotePreviousCurrent(topicId);
+        }
+
+        // Guardar en DB
+        DB.update('topics', topicId, cha
