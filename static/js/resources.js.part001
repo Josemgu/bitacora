@@ -1,0 +1,174 @@
+         <p class="res-desc">${description}</p>
+          <div class="res-meta">
+            <span class="${catTagClass}">${catLabel}</span>
+            ${phaseLabel ? `<span class="tag">${phaseLabel}</span>` : ''}
+            <span class="${dotClass}" title="Link: ${statusLabel}"></span>
+          </div>
+          <div class="res-actions">
+            <button class="btn btn-ghost btn-sm" data-action="archive" data-id="${item.id}">Archivar</button>
+          </div>
+        </article>
+      `;
+    }).join('');
+  };
+
+  /* ==================== CRUD ==================== */
+
+  /* ---------- Modal: Agregar recurso ---------- */
+  const showAddModal = () => {
+    const modalId = 'modal-add-resource';
+    let $modal = document.getElementById(modalId);
+
+    if ($modal) {
+      $modal.classList.remove('hidden');
+      return;
+    }
+
+    /* Crear modal */
+    $modal = document.createElement('div');
+    $modal.id = modalId;
+    $modal.className = 'modal-overlay';
+    $modal.innerHTML = `
+      <div class="modal">
+        <header class="modal-header">
+          <h3>Agregar recurso</h3>
+          <button class="btn btn-ghost btn-sm modal-close" aria-label="Cerrar">&times;</button>
+        </header>
+        <form class="modal-body form-resource" id="form-add-resource">
+          <div class="form-group">
+            <label for="res-url">URL *</label>
+            <input type="url" id="res-url" name="url" required placeholder="https://..." autocomplete="off">
+            <span class="form-hint loading-hint hidden">Detectando título...</span>
+          </div>
+          <div class="form-group">
+            <label for="res-title">Título</label>
+            <input type="text" id="res-title" name="title" placeholder="Título del recurso">
+          </div>
+          <div class="form-group">
+            <label for="res-desc">Descripción</label>
+            <textarea id="res-desc" name="description" rows="2" placeholder="Breve descripción..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="res-category">Categoría</label>
+              <select id="res-category" name="category">
+                ${CATEGORIES.map(c => `<option value="${c}">${getCategoryLabel(c)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="res-phase">Fase</label>
+              <select id="res-phase" name="phase">
+                <option value="">—</option>
+                ${PHASES.map(p => `<option value="${p}">F${p}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </form>
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-ghost modal-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" form="form-add-resource">Guardar</button>
+        </footer>
+      </div>
+    `;
+
+    document.body.appendChild($modal);
+
+    /* Eventos del modal */
+    const closeModal = () => $modal.classList.add('hidden');
+
+    $modal.querySelector('.modal-close').addEventListener('click', closeModal);
+    $modal.querySelector('.modal-cancel').addEventListener('click', closeModal);
+    $modal.addEventListener('click', (e) => {
+      if (e.target === $modal) closeModal();
+    });
+
+    /* Pegar URL → detectar título (simulado) */
+    const $urlInput = $modal.querySelector('#res-url');
+    const $titleInput = $modal.querySelector('#res-title');
+    const $hint = $modal.querySelector('.loading-hint');
+
+    $urlInput.addEventListener('paste', (e) => {
+      const pasted = (e.clipboardData || window.clipboardData).getData('text');
+      if (!pasted) return;
+      try {
+        const u = new URL(pasted);
+        $hint.classList.remove('hidden');
+        /* Simulación: después de 800ms extrae el hostname como título sugerido */
+        setTimeout(() => {
+          if (!$titleInput.value) {
+            $titleInput.value = u.hostname.replace(/^www\./, '');
+          }
+          $hint.classList.add('hidden');
+        }, 800);
+      } catch { /* ignore invalid URL */ }
+    });
+
+    /* Submit del formulario */
+    const $form = $modal.querySelector('#form-add-resource');
+    $form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const fd = new FormData($form);
+      const urlVal = fd.get('url')?.trim();
+      if (!urlVal) return;
+
+      /* Validación básica de URL */
+      let validUrl;
+      try {
+        validUrl = new URL(urlVal).href;
+      } catch {
+        alert('La URL no es válida');
+        return;
+      }
+
+      const newResource = {
+        title: fd.get('title')?.trim() || validUrl,
+        url: validUrl,
+        description: fd.get('description')?.trim() || '',
+        category: fd.get('category') || 'blog',
+        phase: fd.get('phase') != null && fd.get('phase') !== '' ? parseInt(fd.get('phase'), 10) : null,
+        origin: 'manual',
+        status: 'active',
+        link_status: 'unknown',
+        created_at: nowISO(),
+        updated_at: nowISO()
+      };
+
+      const inserted = DB.insert('resources', newResource);
+      if (inserted) {
+        closeModal();
+        $form.reset();
+        render();
+      } else {
+        alert('Error al guardar el recurso.');
+      }
+    });
+
+    /* Enfocar URL */
+    setTimeout(() => $urlInput.focus(), 50);
+  };
+
+  /* ---------- Archivar recurso ---------- */
+  const archiveResource = (id) => {
+    if (!confirm('¿Archivar este recurso? Seguirá disponible pero oculto.')) return;
+    const updated = DB.update('resources', id, {
+      status: 'archived',
+      updated_at: nowISO()
+    });
+    if (updated) render();
+  };
+
+  /* ==================== API Pública ==================== */
+  return {
+    state,
+    init,
+    render,
+    renderFilters,
+    filterData,
+    renderGrid,
+    showAddModal,
+    archiveResource,
+    getFavicon,
+    getCategoryIcon
+  };
+})();
