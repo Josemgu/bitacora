@@ -1,0 +1,158 @@
+/**
+ * generate-roadmap.js — GenerateRoadmap module for Bitacora App
+ * Handles AI-powered roadmap generation via heuristic matching
+ *
+ * Uses global namespace: DB, App
+ * CSS classes used: .view, .panel, .panel-head, .panel-body, .panel-note,
+ *                   .topic-list, .topic, .btn, .btn-primary, .btn-ghost, .btn-sm,
+ *                   .btn-block, .input, .select, .field, .textarea,
+ *                   .tag, .tag-green, .mono, .kicker, .empty, .empty-hint, .empty-sm
+ */
+const GenerateRoadmap = (() => {
+  'use strict';
+
+  /* ── DOM refs ────────────────────────────────────────────── */
+  let $prompt, $level, $duration, $btnGenerate, $resultPanel, $statusTag, $resultArea;
+
+  /* ── State ───────────────────────────────────────────────── */
+  const state = {
+    isGenerating: false,
+    lastStructure: null
+  };
+
+  /* ── Pre-defined roadmap templates (full, topic-rich) ────── */
+  const ROADMAP_TEMPLATES = {
+    /* ── Cloud Security ────────────────────────────────────── */
+    cloudsecurity: {
+      title: 'Cloud Security Specialist Roadmap',
+      phases: [
+        { name: 'Fundamentos de Cloud', topics: ['AWS IAM: users, groups, roles, policies', 'Azure AD y RBAC', 'GCP IAM y Service Accounts', 'Shared Responsibility Model', 'Cloud compliance (SOC2, ISO 27001)'] },
+        { name: 'Network Security',   topics: ['VPC isolation y subnetting', 'Security Groups y NACLs', 'AWS WAF y Shield', 'Azure Firewall y DDoS', 'Zero Trust Network Access (ZTNA)'] },
+        { name: 'Data Protection',    topics: ['Encryption at rest (KMS, Key Vault)', 'Encryption in transit (TLS 1.3)', 'AWS Secrets Manager', 'Data Loss Prevention (DLP)', 'Backup y disaster recovery'] },
+        { name: 'Identity & Access',  topics: ['Single Sign-On (SSO)', 'Multi-Factor Authentication (MFA)', 'Privileged Access Management (PAM)', 'Conditional Access Policies', 'Identity Federation (SAML, OIDC)'] },
+        { name: 'Threat Detection',   topics: ['AWS GuardDuty y Security Hub', 'Azure Sentinel', 'CloudTrail y audit logging', 'SIEM integration en cloud', 'Threat intelligence feeds'] },
+        { name: 'DevSecOps',          topics: ['Container image scanning (Trivy)', 'Infrastructure as Code scanning (Checkov)', 'SAST/DAST en pipelines', 'CSPM (Prisma Cloud, Orca)', 'Incident response en cloud'] }
+      ]
+    },
+
+    /* ── DevOps / Containers ───────────────────────────────── */
+    devops: {
+      title: 'DevOps Engineer Roadmap',
+      phases: [
+        { name: 'Linux & Networking', topics: ['Shell scripting avanzado (Bash, Python)', 'Systemd, cron, process management', 'TCP/IP, DNS, load balancing', 'SSH hardening y key management', 'Monitoring basico (htop, netstat)'] },
+        { name: 'Version Control & CI', topics: ['Git branching strategies (GitFlow, trunk)', 'GitHub Actions: workflows, matrices', 'GitLab CI: runners, artifacts', 'Jenkins: pipelines como codigo', 'Pre-commit hooks y linting'] },
+        { name: 'Containerization',   topics: ['Docker: Dockerfile, layers, caching', 'Docker Compose multi-service', 'Docker networking (bridge, overlay)', 'Container registries (ECR, ACR)', 'Image optimization y distroless'] },
+        { name: 'Orchestration',      topics: ['Kubernetes: Pods, Deployments, Services', 'Helm: charts, values, releases', 'Ingress controllers (Nginx, Traefik)', 'Persistent volumes y storage classes', 'RBAC y network policies'] },
+        { name: 'Observability',      topics: ['Prometheus: metricas, exporters', 'Grafana: dashboards, alerting', 'ELK Stack: Elasticsearch, Logstash', 'Distributed tracing (Jaeger, Tempo)', 'SLIs, SLOs, alert thresholds'] },
+        { name: 'IaC & Cloud',        topics: ['Terraform: state, modules, workspaces', 'AWS: EC2, S3, VPC con Terraform', 'Ansible: playbooks, roles, inventory', 'Pulumi y CDK', 'GitOps con ArgoCD/Flux'] }
+      ]
+    },
+
+    /* ── Python Development ────────────────────────────────── */
+    python: {
+      title: 'Python Developer Roadmap',
+      phases: [
+        { name: 'Core Python',        topics: ['Data structures: list, dict, set, tuple', 'Comprehensions y generators', 'Decorators y closures avanzados', 'Context managers (contextlib)', 'Type hints y mypy'] },
+        { name: 'Standard Library',   topics: ['pathlib, shutil, os', 'asyncio y programacion asincrona', 'logging: configuracion avanzada', 'unittest, pytest, mocking', 'dataclasses y enums'] },
+        { name: 'Web Frameworks',     topics: ['FastAPI: routing, dependencias, OpenAPI', 'Django: ORM, admin, middleware', 'SQLAlchemy 2.0: models, sessions', 'Authentication: JWT, OAuth2', 'Background tasks y Celery'] },
+        { name: 'Data & ML',          topics: ['NumPy: arrays, broadcasting', 'Pandas: DataFrames, merging', 'Data visualization (Plotly, Altair)', 'scikit-learn: pipelines, GridSearch', 'Feature engineering practico'] },
+        { name: 'Testing & Quality',  topics: ['TDD y BDD con pytest', 'Coverage.py y reportes', 'Pre-commit hooks (black, ruff)', 'Docker para desarrollo Python', 'CI/CD para proyectos Python'] },
+        { name: 'Deployment',         topics: ['WSGI/ASGI servers (Gunicorn, Uvicorn)', 'Docker multi-stage para Python', 'Poetry y pip-tools para deps', 'AWS Lambda con Python', 'Monitoreo: Sentry, Datadog'] }
+      ]
+    },
+
+    /* ── Full Stack Web ────────────────────────────────────── */
+    fullstack: {
+      title: 'Full Stack Web Developer Roadmap',
+      phases: [
+        { name: 'Frontend Core',      topics: ['HTML5 semantico y accesibilidad', 'CSS Grid, Flexbox, responsive', 'JavaScript ES2024: modules, optional chaining', 'DOM manipulation y event delegation', 'Fetch API, Promises, async/await'] },
+        { name: 'Frontend Framework', topics: ['React: hooks, context, refs', 'State management (Zustand, Redux)', 'Next.js: routing, SSR, API routes', 'Tailwind CSS y component libraries', 'Frontend testing (RTL, Playwright)'] },
+        { name: 'Backend Core',       topics: ['Node.js: event loop, streams', 'Express.js: middleware, routing', 'REST API design y validacion (Zod)', 'GraphQL: schemas, resolvers, mutations', 'WebSockets y realtime'] },
+        { name: 'Database Layer',     topics: ['PostgreSQL: queries avanzadas, indexes', 'Prisma ORM: migrations, relations', 'MongoDB: aggregation pipeline', 'Redis: caching, sessions, pub/sub', 'Database transactions y ACID'] },
+        { name: 'Auth & Security',    topics: ['JWT: sign, verify, refresh tokens', 'OAuth 2.0 / OpenID Connect', 'Password hashing (bcrypt, Argon2)', 'CSRF, XSS, SQL injection prevention', 'Rate limiting y CORS'] },
+        { name: 'DevOps & Deploy',    topics: ['Docker: Dockerfile, compose', 'CI/CD: GitHub Actions', 'Vercel / Railway deployment', 'Monitoring: logs, health checks', 'Performance optimization'] }
+      ]
+    },
+
+    /* ── Generic Tech ──────────────────────────────────────── */
+    generic: {
+      title: 'Technology Learning Roadmap',
+      phases: [
+        { name: 'Fundamentos',        topics: ['Conceptos basicos y terminologia', 'Configuracion del entorno de desarrollo', 'Herramientas esenciales del ecosistema', 'Primer proyecto practico paso a paso', 'Comunidades y recursos de aprendizaje'] },
+        { name: 'Conceptos Clave',    topics: ['Arquitectura y patrones fundamentales', 'Flujo de trabajo estandar', 'Integracion con herramientas externas', 'Testing y calidad de codigo', 'Documentacion y buenas practicas'] },
+        { name: 'Profundizacion',     topics: ['Patrones avanzados y casos complejos', 'Optimizacion de rendimiento', 'Seguridad y hardening', 'Escalabilidad y arquitectura', 'Debugging y troubleshooting'] },
+        { name: 'Especializacion',    topics: ['Casos de uso avanzados del sector', 'Herramientas especializadas y nichos', 'Integracion con otras tecnologias', 'Proyectos practicos avanzados', 'Contribucion a proyectos open source'] },
+        { name: 'Produccion',         topics: ['CI/CD y automatizacion', 'Monitoreo y observabilidad', 'Manejo de errores en produccion', 'Estrategias de deployment', 'Mantenimiento y evolucion'] },
+        { name: 'Liderazgo',          topics: ['Mentoria y revision de codigo', 'Diseno de sistemas', 'Toma de decisiones tecnicas', 'Evaluacion de nuevas tecnologias', 'Comunicacion tecnica efectiva'] }
+      ]
+    }
+  };
+
+  /* ── Keyword → template mapping ──────────────────────────── */
+  const KEYWORD_MAP = [
+    { keywords: ['security', 'cyber', 'ciberseguridad', 'pentesting', 'hacking', 'cloud security'], template: 'cloudsecurity' },
+    { keywords: ['devops', 'docker', 'kubernetes', 'k8s', 'container', 'ci/cd', 'jenkins', 'terraform'], template: 'devops' },
+    { keywords: ['python', 'django', 'flask', 'fastapi', 'pandas', 'numpy', 'scikit'], template: 'python' },
+    { keywords: ['fullstack', 'full stack', 'web dev', 'mern', 'mean', 'react', 'nextjs', 'node'], template: 'fullstack' }
+  ];
+
+  /* ── Init ────────────────────────────────────────────────── */
+  function init() {
+    $prompt       = document.getElementById('generate-prompt');
+    $level        = document.getElementById('generate-level');
+    $duration     = document.getElementById('generate-duration');
+    $btnGenerate  = document.getElementById('btn-generate-roadmap');
+    $resultPanel  = document.getElementById('generate-result-panel');
+    $statusTag    = document.getElementById('generate-status-tag');
+    $resultArea   = document.getElementById('generate-result-area');
+
+    if (!$btnGenerate) return;
+
+    $btnGenerate.addEventListener('click', handleGenerate);
+
+    /* Hide result panel initially */
+    if ($resultPanel) {
+      $resultPanel.style.display = 'none';
+    }
+    if ($statusTag) {
+      $statusTag.style.display = 'none';
+    }
+  }
+
+  /* ── Handle generate button click ────────────────────────── */
+  function handleGenerate() {
+    if (state.isGenerating) return;
+
+    const prompt   = $prompt ? $prompt.value.trim() : '';
+    const level    = $level ? $level.value : 'beginner';
+    const duration = $duration ? parseInt($duration.value, 10) || 6 : 6;
+
+    if (!prompt) {
+      showErrorInPanel('Describe el tema o tecnologia para generar el roadmap');
+      return;
+    }
+
+    showLoading();
+
+    /* Simulate AI thinking delay (2-3 seconds) */
+    const delay = 2000 + Math.random() * 1000;
+
+    setTimeout(() => {
+      try {
+        const structure = generateStructure(prompt, level, duration);
+        state.lastStructure = structure;
+        hideLoading();
+        renderResult(structure, level, duration);
+      } catch (err) {
+        hideLoading();
+        showErrorInPanel('Error al generar: ' + err.message);
+      }
+    }, delay);
+  }
+
+  /* ── Generate structure from prompt heuristic ────────────── */
+  function generateStructure(prompt, level, duration) {
+    const promptLower = prompt.toLowerCase();
+
+    /* Match keyword → template */
+    let templateKey = 'generic';
