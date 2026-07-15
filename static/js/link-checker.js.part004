@@ -1,0 +1,22 @@
+  /* ═══════════════════════════════════════════════════════════════════════
+     API PUBLICA
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  return {
+    init,
+    verifyOne,
+    verifyAll,
+    cancel,
+    checkRobotsTxt,
+    canCheckUrl,
+    getStatusColor,
+    getStatusDot,
+    getStatusLabel,
+    showBrokenOptions,
+    showCorsWarning,
+    hideCorsWarning,
+    /* Exponer estado para debug */
+    get isRunning() { return _isRunning; }
+  };
+
+})();
