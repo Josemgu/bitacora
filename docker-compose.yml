@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  bitacora:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/bitacora.db}
+    restart: unless-stopped
