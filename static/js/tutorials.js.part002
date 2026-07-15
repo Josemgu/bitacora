@@ -1,0 +1,133 @@
+lass="res-ext">
+              <svg class="ico" style="width:14px;height:14px;opacity:.5;"><use href="#i-${platIcon}"></use></svg>
+            </div>
+          </div>
+          <h4 style="margin:8px 0 4px;font-size:14px;font-weight:600;color:var(--text);">
+            ${escapeHtml(item.title)}
+          </h4>
+          <p style="margin:0 0 6px;font-size:12px;color:var(--text-sec);line-height:1.4;">
+            ${escapeHtml(item.description)}
+          </p>
+          <p style="margin:0 0 10px;font-size:11px;color:var(--text-sec);opacity:.7;">
+            <span class="dot dot-blue"></span>
+            ${escapeHtml(item.author)}
+          </p>
+          <div class="chip-row" style="gap:6px;margin-bottom:8px;">
+            <span class="chip chip-sm" style="background:var(--${typeColor})22;color:var(--${typeColor});border-color:var(--${typeColor})44;">
+              ${typeLabel}
+            </span>
+            ${tagsHtml}
+          </div>
+          <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary" style="width:100%;text-align:center;"
+             onclick="Tutorials.openTutorial('${escapeHtml(item.url)}');return false;">
+            <svg class="ico" style="width:12px;height:12px;margin-right:4px;"><use href="#i-externo"></use></svg>
+            Ver recurso
+          </a>
+        </div>
+      `;
+    }).join('');
+
+    $grid.innerHTML = `<div class="res-grid">${html}</div>`;
+  }
+
+  function renderTypeChips() {
+    if (!$chips) return;
+
+    const types = ['all', ...new Set(TUTORIALS_DATA.map(t => t.type))];
+    const labels = { all: 'Todos' };
+
+    const html = types.map(t => {
+      const label = labels[t] || getTypeLabel(t);
+      const isOn  = state.type === t ? 'is-on' : '';
+      return `<button class="chip ${isOn}" data-type="${t}">${escapeHtml(label)}</button>`;
+    }).join('');
+
+    $chips.innerHTML = html;
+  }
+
+  function render() {
+    renderTypeChips();
+    const filtered = filterData();
+    renderGrid(filtered);
+  }
+
+  /* ═══════════════════════════════════════════
+     Actions
+     ═══════════════════════════════════════════ */
+
+  function openTutorial(url) {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function clearFilters() {
+    state.filterText = '';
+    state.type       = 'all';
+    if ($search) $search.value = '';
+    render();
+  }
+
+  /* ═══════════════════════════════════════════
+     Event bindings
+     ═══════════════════════════════════════════ */
+
+  function bindClearFilters() {
+    const $clearBtn = $grid?.querySelector('#tutorials-clear-filters');
+    if ($clearBtn) {
+      $clearBtn.addEventListener('click', clearFilters);
+    }
+  }
+
+  function bindEvents() {
+    if (!$search || !$chips) return;
+
+    /* Search */
+    $search.addEventListener('input', (e) => {
+      state.filterText = e.target.value;
+      const filtered = filterData();
+      renderGrid(filtered);
+    });
+
+    /* Type chips */
+    $chips.addEventListener('click', (e) => {
+      const $chip = e.target.closest('.chip[data-type]');
+      if (!$chip) return;
+
+      state.type = $chip.dataset.type;
+      render();
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+     Init
+     ═══════════════════════════════════════════ */
+
+  function init() {
+    try {
+      $view   = document.getElementById('view-tutorials');
+      $search = document.getElementById('tutorials-search');
+      $chips  = document.getElementById('tutorials-type-chips');
+      $grid   = document.getElementById('tutorials-grid');
+
+      if (!$grid) {
+        console.warn('[Tutorials] #tutorials-grid no encontrado. Render omitido.');
+        return;
+      }
+
+      render();
+      bindEvents();
+    } catch (err) {
+      console.error('[Tutorials] Error en init:', err);
+    }
+  }
+
+  /* ── Public API ── */
+  return {
+    init,
+    render,
+    filterData,
+    renderGrid,
+    getTypeLabel,
+    getTypeIcon,
+    openTutorial
+  };
+})();
