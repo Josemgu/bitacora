@@ -1,0 +1,197 @@
+            <button class="btn btn-sm btn-ghost cfg-edit-btn" data-id="${esc(p.id)}">Editar</button>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    html += `<button id="cfg-add-provider" class="btn btn-primary" style="margin-top:0.75rem;">+ Anadir proveedor</button>`;
+
+    $wrap.innerHTML = html;
+
+    // Eventos
+    $wrap.querySelectorAll('.cfg-test-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        btn.disabled = true;
+        btn.textContent = 'Probando...';
+        const result = await AIChat.testConnection(id);
+        btn.disabled = false;
+        btn.textContent = 'Probar';
+        if (result.ok) {
+          btn.textContent = `${result.latencyMs}ms`;
+          setTimeout(() => { btn.textContent = 'Probar'; }, 3000);
+        } else {
+          alert(`Error: ${result.error}`);
+        }
+      });
+    });
+
+    $wrap.querySelectorAll('.cfg-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => _showEditProvider(Number(btn.dataset.id)));
+    });
+
+    document.getElementById('cfg-add-provider')?.addEventListener('click', () => showAddProvider());
+  }
+
+  /**
+   * Muestra el formulario para anadir o editar un proveedor.
+   * @param {Object|null} provider — Proveedor a editar, o null para nuevo
+   * @private
+   */
+  function _renderProviderForm(provider = null) {
+    const $wrap = document.getElementById('cfg-provider-form-wrap');
+    if (!$wrap) return;
+
+    state.editingId = provider ? provider.id : null;
+    const isEdit = !!provider;
+    const p = provider || {};
+
+    $wrap.style.display = 'block';
+    $wrap.innerHTML = `
+      <div class="panel" style="padding:1rem;">
+        <h4 style="margin:0 0 0.75rem;font-size:1rem;color:#e2e8f0;">${isEdit ? 'Editar' : 'Nuevo'} proveedor</h4>
+
+        ${!isEdit ? `
+        <div class="field" style="margin-bottom:0.75rem;">
+          <label class="label" style="font-size:0.875rem;color:#94a3b8;">Plantilla</label>
+          <select id="cfg-tmpl" class="select" style="width:100%;">
+            <option value="">-- Personalizado --</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="google">Google</option>
+            <option value="ollama">Ollama (local)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        ` : ''}
+
+        <div class="field" style="margin-bottom:0.75rem;">
+          <label class="label" style="font-size:0.875rem;color:#94a3b8;">Nombre</label>
+          <input id="cfg-name" class="input" value="${esc(p.name || '')}" placeholder="Ej: OpenAI" style="width:100%;">
+        </div>
+
+        <div class="field" style="margin-bottom:0.75rem;">
+          <label class="label" style="font-size:0.875rem;color:#94a3b8;">Endpoint</label>
+          <input id="cfg-endpoint" class="input" value="${esc(p.endpoint || '')}" placeholder="https://api..." style="width:100%;">
+        </div>
+
+        <div class="field" style="margin-bottom:0.75rem;">
+          <label class="label" style="font-size:0.875rem;color:#94a3b8;">Modelo</label>
+          <input id="cfg-model" class="input" value="${esc(p.model || '')}" placeholder="gpt-4o-mini" style="width:100%;">
+        </div>
+
+        <div class="field" style="margin-bottom:0.75rem;">
+          <label class="label" style="font-size:0.875rem;color:#94a3b8;">Nombre variable entorno</label>
+          <input id="cfg-env" class="input" value="${esc(p.env_key_name || '')}" placeholder="$OPENAI_API_KEY" style="width:100%;">
+          <p class="note" style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">Solo referencia. La clave real nunca se almacena.</p>
+        </div>
+
+        <div class="field" style="margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem;">
+          <input id="cfg-active" type="checkbox" ${p.active !== false ? 'checked' : ''}>
+          <label for="cfg-active" style="font-size:0.875rem;color:#e2e8f0;">Activo</label>
+        </div>
+
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+          <button id="cfg-save" class="btn btn-primary">${isEdit ? 'Guardar cambios' : 'Crear proveedor'}</button>
+          <button id="cfg-cancel" class="btn btn-ghost">Cancelar</button>
+          ${isEdit ? `<button id="cfg-delete" class="btn btn-danger">Eliminar</button>` : ''}
+        </div>
+      </div>
+    `;
+
+    // Auto-rellenar desde plantilla
+    if (!isEdit) {
+      document.getElementById('cfg-tmpl')?.addEventListener('change', (e) => {
+        const tmpl = PROVIDER_TEMPLATES[e.target.value];
+        if (!tmpl) return;
+        document.getElementById('cfg-name').value = tmpl.name;
+        document.getElementById('cfg-endpoint').value = tmpl.endpoint;
+        document.getElementById('cfg-model').value = tmpl.model;
+        document.getElementById('cfg-env').value = tmpl.env_key_name;
+        document.getElementById('cfg-active').checked = tmpl.active;
+      });
+    }
+
+    // Guardar
+    document.getElementById('cfg-save')?.addEventListener('click', () => {
+      const record = {
+        name: document.getElementById('cfg-name').value.trim(),
+        endpoint: document.getElementById('cfg-endpoint').value.trim(),
+        model: document.getElementById('cfg-model').value.trim(),
+        env_key_name: document.getElementById('cfg-env').value.trim(),
+        active: document.getElementById('cfg-active').checked
+      };
+
+      if (!record.name) {
+        alert('El nombre es obligatorio.');
+        return;
+      }
+      if (!record.endpoint) {
+        alert('El endpoint es obligatorio.');
+        return;
+      }
+
+      if (isEdit) {
+        DB.update('ai_providers', state.editingId, record);
+      } else {
+        DB.insert('ai_providers', record);
+      }
+
+      _closeForm();
+      renderProviders();
+      AIChat.loadProviders();
+      AIChat.renderProviderSelector();
+    });
+
+    // Cancelar
+    document.getElementById('cfg-cancel')?.addEventListener('click', _closeForm);
+
+    // Eliminar
+    document.getElementById('cfg-delete')?.addEventListener('click', () => {
+      if (!confirm('Seguro que quieres eliminar este proveedor?')) return;
+      DB.delete('ai_providers', state.editingId);
+      _closeForm();
+      renderProviders();
+      AIChat.loadProviders();
+      AIChat.renderProviderSelector();
+    });
+  }
+
+  /** Muestra formulario para nuevo proveedor. */
+  function showAddProvider() {
+    _renderProviderForm(null);
+  }
+
+  /** Muestra formulario para editar proveedor existente. @private */
+  function _showEditProvider(id) {
+    const p = state.providers.find(pr => pr.id === id);
+    if (!p) return;
+    _renderProviderForm(p);
+  }
+
+  /** Cierra el formulario. @private */
+  function _closeForm() {
+    const $wrap = document.getElementById('cfg-provider-form-wrap');
+    if ($wrap) {
+      $wrap.style.display = 'none';
+      $wrap.innerHTML = '';
+    }
+    state.editingId = null;
+  }
+
+  /* ═════════════════════════════  9b. BOTONES DE ACCION  ═════════════════════════════ */
+
+  /** Renderiza botones de accion. */
+  function renderActionButtons() {
+    const $wrap = document.getElementById('cfg-actions');
+    if (!$wrap) return;
+
+    // Verificar si hay backend disponible
+    const hasBackend = typeof LinkChecker !== 'undefined';
+    const hasProvider = state.providers.some(p => p.active !== false);
+    const disabled = !hasBackend;
+    const title = disabled
+      ? 'Requiere backend activo'
+      : (!hasProvider ? 'Configura un proveedor de IA primero' : '');
+
+    $wrap.innerHTML = `
