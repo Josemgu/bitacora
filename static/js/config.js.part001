@@ -1,0 +1,197 @@
+/**
+ * config.js — F9: Panel de configuracion.
+ * Namespace global: Config
+ * Dependencias: DB (js/db.js), AIChat (js/ai-chat.js)
+ *
+ * Secciones:
+ *   9a. Proveedores de IA
+ *   9b. Botones de accion
+ *   9c. Exportar / Importar
+ *   9d. Zona de peligro
+ */
+const Config = (() => {
+  'use strict';
+
+  /* ═════════════════════════════  ESTADO  ═════════════════════════════ */
+
+  const state = {
+    providers: [],     // Lista de proveedores de IA
+    editingId: null,   // ID del proveedor en edicion (null = nuevo)
+    importData: null,  // Datos pendientes de importar
+    importDiff: null   // Diff calculado para importacion
+  };
+
+  /* Cache DOM */
+  let $container = null;
+
+  /* ═════════════════════════════  CONSTANTES  ═════════════════════════════ */
+
+  const ACCENT_COLORS = [
+    { hex: '#3fb950', name: 'Verde' },
+    { hex: '#58a6ff', name: 'Azul' },
+    { hex: '#a371f7', name: 'Purpura' },
+    { hex: '#f85149', name: 'Rojo' },
+    { hex: '#39c5cf', name: 'Cyan' },
+    { hex: '#d29922', name: 'Naranja' }
+  ];
+
+  const PROVIDER_TEMPLATES = {
+    openai: {
+      name: 'OpenAI',
+      endpoint: 'https://api.openai.com/v1/chat/completions',
+      model: 'gpt-4o-mini',
+      env_key_name: '$OPENAI_API_KEY',
+      active: true
+    },
+    anthropic: {
+      name: 'Anthropic',
+      endpoint: 'https://api.anthropic.com/v1/messages',
+      model: 'claude-3-haiku-20240307',
+      env_key_name: '$ANTHROPIC_API_KEY',
+      active: true
+    },
+    google: {
+      name: 'Google',
+      endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+      model: 'gemini-1.5-flash',
+      env_key_name: '$GOOGLE_API_KEY',
+      active: true
+    },
+    ollama: {
+      name: 'Ollama',
+      endpoint: 'http://localhost:11434/api/chat',
+      model: 'llama3.2',
+      env_key_name: '',
+      active: true
+    },
+    custom: {
+      name: '',
+      endpoint: '',
+      model: '',
+      env_key_name: '',
+      active: true
+    }
+  };
+
+  /* Tablas requeridas para importacion */
+  const REQUIRED_TABLES = ['phases', 'topics', 'resources', 'ai_providers'];
+
+  /* ═════════════════════════════  UTILIDADES  ═════════════════════════════ */
+
+  const esc = (str) => {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+  };
+
+  const nowISO = () => new Date().toISOString();
+
+  /** Formatea fecha para nombre de archivo: YYYY-MM-DD */
+  const fmtDate = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  /* ═════════════════════════════  INICIALIZACION  ═════════════════════════════ */
+
+  /** Inicializa la vista de configuracion. */
+  function init() {
+    $container = document.getElementById('config-view');
+    if (!$container) {
+      console.warn('[Config] No se encontro #config-view');
+      return;
+    }
+    render();
+  }
+
+  /** Renderiza todo el panel de configuracion. */
+  function render() {
+    if (!$container) return;
+    $container.innerHTML = `
+      <div style="max-width:960px;margin:0 auto;padding:1rem;display:flex;flex-direction:column;gap:2rem;">
+        <h2 style="margin:0;font-size:1.5rem;color:#e2e8f0;">Configuracion</h2>
+
+        <!-- 9a. Proveedores de IA -->
+        <section id="cfg-providers-section">
+          <h3 style="font-size:1.125rem;color:#e2e8f0;margin-bottom:0.75rem;">Proveedores de IA</h3>
+          <div id="cfg-providers-list"></div>
+          <div id="cfg-provider-form-wrap" style="margin-top:1rem;display:none;"></div>
+        </section>
+
+        <!-- 9b. Apariencia -->
+        <section id="cfg-appearance-section" style="padding-top:1rem;border-top:1px solid #334155;">
+          <h3 style="font-size:1.125rem;color:#e2e8f0;margin-bottom:0.75rem;">Apariencia</h3>
+          <div id="cfg-appearance" style="display:flex;flex-direction:column;gap:1rem;"></div>
+        </section>
+
+        <!-- 9c. Botones de accion -->
+        <section id="cfg-actions-section" style="padding-top:1rem;border-top:1px solid #334155;">
+          <h3 style="font-size:1.125rem;color:#e2e8f0;margin-bottom:0.75rem;">Acciones</h3>
+          <div id="cfg-actions" style="display:flex;gap:0.75rem;flex-wrap:wrap;"></div>
+        </section>
+
+        <!-- 9d. Exportar / Importar -->
+        <section id="cfg-data-section" style="padding-top:1rem;border-top:1px solid #334155;">
+          <h3 style="font-size:1.125rem;color:#e2e8f0;margin-bottom:0.75rem;">Datos</h3>
+          <div id="cfg-data-actions" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;"></div>
+          <div id="cfg-import-preview" style="margin-top:1rem;display:none;"></div>
+        </section>
+
+        <!-- 9e. Zona de peligro -->
+        <section id="cfg-danger-section" style="padding-top:1rem;border-top:1px solid #334155;">
+          <h3 style="font-size:1.125rem;color:#ef4444;margin-bottom:0.75rem;">Zona de peligro</h3>
+          <div id="cfg-danger"></div>
+        </section>
+      </div>
+    `;
+
+    renderProviders();
+    renderAppearance();
+    renderActionButtons();
+    renderDataActions();
+    renderDangerZone();
+  }
+
+  /* ═════════════════════════════  9a. PROVEEDORES DE IA  ═════════════════════════════ */
+
+  /** Muestra la lista de proveedores configurados. */
+  function renderProviders() {
+    const $wrap = document.getElementById('cfg-providers-list');
+    if (!$wrap) return;
+
+    state.providers = DB.getAll('ai_providers');
+
+    if (state.providers.length === 0) {
+      $wrap.innerHTML = `
+        <div class="panel" style="padding:1rem;text-align:center;color:#64748b;">
+          <p>No hay proveedores configurados.</p>
+          <button id="cfg-add-first" class="btn btn-primary" style="margin-top:0.5rem;">Anadir proveedor</button>
+        </div>
+      `;
+      document.getElementById('cfg-add-first')?.addEventListener('click', () => showAddProvider());
+      return;
+    }
+
+    let html = '<div style="display:flex;flex-direction:column;gap:0.5rem;">';
+    state.providers.forEach(p => {
+      const statusClass = p.active !== false ? 'tag tag-green' : 'tag';
+      const statusLabel = p.active !== false ? 'Activo' : 'Inactivo';
+      const endpoint = p.endpoint || '-';
+      const model = p.model || '-';
+
+      html += `
+        <div class="panel" style="padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;" data-provider-id="${esc(p.id)}">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-weight:600;color:#e2e8f0;">${esc(p.name)}</div>
+            <div style="font-size:0.8125rem;color:#64748b;margin-top:0.25rem;">
+              <span class="${statusClass}">${statusLabel}</span>
+              <span style="margin-left:0.5rem;">${esc(endpoint)}</span>
+              <span style="margin-left:0.5rem;color:#475569;">| ${esc(model)}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;">
+            <button class="btn btn-sm btn-ghost cfg-test-btn" data-id="${esc(p.id)}" title="Probar conexion">Probar</button>
