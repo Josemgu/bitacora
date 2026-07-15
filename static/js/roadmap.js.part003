@@ -1,0 +1,233 @@
+nges);
+
+        // Recalcular TODO en cascada
+        _recalculateAfterTopicChange(topic.phase_id);
+    }
+
+    /**
+     * Busca el tema que estaba 'current' (globalmente) y lo baja a 'todo'.
+     * Solo UN current a la vez en toda la app.
+     * @param {number} currentTopicId — ID del topic que sera el nuevo current
+     * @private
+     */
+    function _demotePreviousCurrent(currentTopicId) {
+        var allTopics = DB.getAll('topics');
+        for (var i = 0; i < allTopics.length; i++) {
+            var t = allTopics[i];
+            if (t.id !== currentTopicId && t.status === 'current') {
+                DB.update('topics', t.id, { status: 'todo' });
+                break; // Solo uno
+            }
+        }
+    }
+
+    /**
+     * Recalcula todo en cascada despues de cambiar un topic:
+     * a) Progreso de fase
+     * b) Progreso global (spine + sidebar)
+     * c) Estado de fase (done/current)
+     * d) Clases de nodos
+     * e) Phase-strip
+     * @param {number} phaseId — ID de la fase afectada
+     * @private
+     */
+    function _recalculateAfterTopicChange(phaseId) {
+        var allTopics = DB.getAll('topics');
+        var phaseTopics = allTopics.filter(function (t) { return t.phase_id === phaseId; });
+        phaseTopics.sort(function (a, b) { return a.order - b.order; });
+
+        // a) Progreso de fase
+        var phaseProgress = _calcPhaseProgress(phaseTopics);
+        var phaseBarFill = _els.phaseStrip ?
+            _els.phaseStrip.querySelector('.strip-item:nth-child(' + _getPhaseIndex(phaseId) + ') .bar-fill') : null;
+        if (phaseBarFill) {
+            phaseBarFill.style.width = phaseProgress.percent + '%';
+        }
+
+        // c) Estado de fase y d) clases de nodo
+        updateNodeState(phaseId);
+
+        // b) Progreso global
+        var progress = calculateProgress();
+        refreshSpine();
+        _applyProgress(progress);
+
+        // e) Actualizar strip completo para reflejar cambios globales
+        refreshStrip();
+
+        // Actualizar clases de topics en el DOM
+        _refreshTopicElements(phaseTopics);
+    }
+
+    /**
+     * Actualiza las clases de los elementos .topic en el DOM.
+     * @param {Array} phaseTopics — topics de la fase
+     * @private
+     */
+    function _refreshTopicElements(phaseTopics) {
+        if (!_els.spineNodes) return;
+
+        phaseTopics.forEach(function (topic) {
+            var el = _els.spineNodes.querySelector('.topic[data-topic-id="' + topic.id + '"]');
+            if (!el) return;
+
+            el.classList.remove('done', 'current');
+            if (topic.status === 'done' || topic.status === 'current') {
+                el.classList.add(topic.status);
+            }
+        });
+    }
+
+    /**
+     * Obtiene el indice visual de una fase (1-based) para el selector nth-child.
+     * @param {number} phaseId — ID de la fase
+     * @returns {number} indice 1-based
+     * @private
+     */
+    function _getPhaseIndex(phaseId) {
+        var phases = DB.getAll('phases');
+        phases.sort(function (a, b) { return a.index - b.index; });
+        for (var i = 0; i < phases.length; i++) {
+            if (phases[i].id === phaseId) return i + 1;
+        }
+        return 1;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       PROGRESO
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Calcula el progreso global y por fase.
+     * @returns {Object} { global: number, byPhase: Array<{phaseId, done, total, percent}> }
+     */
+    function calculateProgress() {
+        var topics = DB.getAll('topics');
+        var phases = DB.getAll('phases');
+
+        var totalDone = 0;
+        var byPhase = [];
+
+        phases.forEach(function (phase) {
+            var phaseTopics = topics.filter(function (t) { return t.phase_id === phase.id; });
+            var done = phaseTopics.filter(function (t) { return t.status === 'done'; }).length;
+            totalDone += done;
+
+            byPhase.push({
+                phaseId: phase.id,
+                done: done,
+                total: phaseTopics.length,
+                percent: phaseTopics.length ? Math.round((done / phaseTopics.length) * 100) : 0
+            });
+        });
+
+        return {
+            global: Math.round((totalDone / TOTAL_TOPICS) * 100),
+            byPhase: byPhase
+        };
+    }
+
+    /**
+     * Calcula el progreso de una fase especifica.
+     * @param {Array} phaseTopics — topics de la fase
+     * @returns {Object} { done, total, percent }
+     * @private
+     */
+    function _calcPhaseProgress(phaseTopics) {
+        var done = phaseTopics.filter(function (t) { return t.status === 'done'; }).length;
+        return {
+            done: done,
+            total: phaseTopics.length,
+            percent: phaseTopics.length ? Math.round((done / phaseTopics.length) * 100) : 0
+        };
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       REFRESH PARCIALES
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Actualiza solo la phase-strip (barras de progreso por fase).
+     */
+    function refreshStrip() {
+        if (!_els.phaseStrip) {
+            _cacheDOM();
+        }
+
+        var phases = DB.getAll('phases');
+        var topics = DB.getAll('topics');
+
+        phases.sort(function (a, b) { return a.index - b.index; });
+
+        phases.forEach(function (phase, idx) {
+            var phaseTopics = topics.filter(function (t) { return t.phase_id === phase.id; });
+            var done = phaseTopics.filter(function (t) { return t.status === 'done'; }).length;
+            var pct = phaseTopics.length ? Math.round((done / phaseTopics.length) * 100) : 0;
+
+            var barFill = _els.phaseStrip.querySelector('.strip-item:nth-child(' + (idx + 1) + ') .bar-fill');
+            if (barFill) {
+                barFill.style.width = pct + '%';
+            }
+        });
+    }
+
+    /**
+     * Actualiza solo la linea de progreso global (.spine-fill).
+     */
+    function refreshSpine() {
+        if (!_els.spineFill) {
+            _cacheDOM();
+        }
+
+        var progress = calculateProgress();
+        if (_els.spineFill) {
+            _els.spineFill.style.height = progress.global + '%';
+        }
+    }
+
+    /**
+     * Actualiza las clases de estado de un nodo (.state-done / .state-current).
+     * @param {number} phaseId — ID de la fase
+     */
+    function updateNodeState(phaseId) {
+        if (!_els.spineNodes) return;
+
+        var topics = DB.getAll('topics');
+        var phaseTopics = topics.filter(function (t) { return t.phase_id === phaseId; });
+        var phaseState = _getPhaseState(phaseTopics);
+
+        var node = _els.spineNodes.querySelector('.node[data-phase-id="' + phaseId + '"]');
+        if (!node) return;
+
+        // Remover clases de estado actuales
+        node.classList.remove('state-done', 'state-current');
+
+        // Aplicar nueva clase
+        if (phaseState === 'done') {
+            node.classList.add('state-done');
+        } else if (phaseState === 'current') {
+            node.classList.add('state-current');
+        }
+
+        // Actualizar pulse
+        var nodeDot = node.querySelector('.node-dot');
+        if (nodeDot) {
+            var existingPulse = nodeDot.querySelector('.pulse');
+            if (phaseState === 'current' && !existingPulse) {
+                var pulse = document.createElement('i');
+                pulse.className = 'pulse';
+                nodeDot.appendChild(pulse);
+            } else if (phaseState !== 'current' && existingPulse) {
+                existingPulse.remove();
+            }
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UTILIDADES
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Determina el estado agregado de una fase basado en sus topics.
+     * - 'done':    todos los topics estan done
+     * - 'current': al menos uno esta done o curre
