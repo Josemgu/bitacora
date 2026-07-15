@@ -1,0 +1,129 @@
+/**
+ * Messages - Buzon estilo correo (Mailbox v2)
+ * Vista: #view-messages
+ * Namespace global: Messages
+ */
+const Messages = (() => {
+  'use strict';
+
+  /* ================================================================
+     CONSTANTES
+     ================================================================ */
+  const SENDER_NAME = 'Bitacora IA';
+  const SENDER_ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+  const PREVIEW_LENGTH = 100;
+
+  /* ================================================================
+     SEED DATA v2 — 8 mensajes variados y realistas
+     Campos: id, kind, subject, body, requires_auth, status, created_at
+     ================================================================ */
+  const MESSAGES_SEED = [
+    {
+      id: 'msg_001',
+      kind: 'news',
+      subject: 'Nueva vulnerabilidad critica en OpenSSL 3.x',
+      body: 'Se ha detectado una vulnerabilidad de severidad alta (CVE-2024-XXXX) en OpenSSL 3.x que permite ejecucion remota de codigo. Revisa tus servicios expuestos y actualiza a la version 3.2.1 o superior. Esto afecta directamente a tu homelab si tienes servicios web con TLS.',
+      requires_auth: false,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString()
+    },
+    {
+      id: 'msg_002',
+      kind: 'news',
+      subject: 'AWS anuncia nuevas regiones en Sudamerica para 2026',
+      body: 'Amazon Web Services ha confirmado la apertura de una nueva region en Chile para mediados de 2026. Esto permitira latencias menores a 20ms para servicios cloud en la region y abrira nuevas oportunidades de compliance con datos locales.',
+      requires_auth: false,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString()
+    },
+    {
+      id: 'msg_003',
+      kind: 'new_resource',
+      subject: 'Nuevo recurso: Kubernetes Security Advanced — requiere tu revision',
+      body: 'He encontrado un curso avanzado de seguridad en Kubernetes que se alinea con tu Fase 4. Cubre RBAC, network policies, pod security standards, admission controllers y escaneo de vulnerabilidades con Trivy. El contenido parece de alta calidad y complementa lo que ya tienes en tu roadmap.',
+      requires_auth: true,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString()
+    },
+    {
+      id: 'msg_004',
+      kind: 'new_resource',
+      subject: 'Laboratorio practico: Purple Team con Wazuh y Atomic Red Team',
+      body: 'Encontre un laboratorio hands-on que te guia paso a paso en la simulacion de tecnicas MITRE ATT&CK usando Atomic Red Team mientras Wazuh las detecta en tiempo real. Perfecto para tu Fase 5 (SOC casero). Requiere aprobacion para agregarlo a tu cola de laboratorios.',
+      requires_auth: true,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString()
+    },
+    {
+      id: 'msg_005',
+      kind: 'broken_link',
+      subject: 'Link roto detectado: "Cloud Security Alliance — Top Threats"',
+      body: 'El enlace al recurso "Cloud Security Alliance — Top Threats" que guardaste hace 3 semanas ha devuelto un error 404. Es posible que la pagina haya sido movida o eliminada. Te sugiero buscar una alternativa en el sitio oficial de CSA o archivar este recurso.',
+      requires_auth: true,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString()
+    },
+    {
+      id: 'msg_006',
+      kind: 'reminder',
+      subject: 'Recordatorio: Examen AWS Certified Security en 3 dias',
+      body: 'Tu examen de AWS Certified Security — Specialty esta programado para dentro de 3 dias (18 de julio, 14:00 UTC). Te recomiendo hacer un repaso de los temas clave: IAM policies, KMS, VPC endpoints, GuardDuty y Security Hub. Tambien puedes hacer un practice test de LetsDefend.',
+      requires_auth: false,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString()
+    },
+    {
+      id: 'msg_007',
+      kind: 'suggestion',
+      subject: 'Sugerencia: Refuerza IAM Policies antes del examen',
+      body: 'Basado en tu progreso de estudio, detecte que tus resultados en quizzes relacionados con IAM Policies son un 23% mas bajos que el promedio de otros temas. Te sugiero dedicarle 2 sesiones extras esta semana antes del examen. Puedo generarte ejercicios practicos especificos si quieres.',
+      requires_auth: true,
+      status: 'unread',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+    },
+    {
+      id: 'msg_008',
+      kind: 'roadmap_update',
+      subject: 'Actualizacion: Fase 1 completada al 38% — nuevo hito alcanzado',
+      body: 'Has completado exitosamente el modulo "rsyslog centralizado" de tu Fase 1. Tu progreso general del roadmap ha subido de 11% a 12%. Los siguientes temas pendientes son: backups con restore verificado, reglas de firewall inter-VLAN en pfSense y analisis con Wireshark entre VLANs.',
+      requires_auth: false,
+      status: 'read',
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString()
+    }
+  ];
+
+  /* ================================================================
+     CONFIGURACION DE KINDS (mapeo a labels, colores, iconos)
+     ================================================================ */
+  const KIND_MAP = {
+    news:           { label: 'Noticia',       color: '#58a6ff', dot: 'dot-blue' },
+    new_resource:   { label: 'Nuevo recurso', color: '#3fb950', dot: 'dot-green' },
+    broken_link:    { label: 'Link roto',     color: '#f85149', dot: 'dot-red' },
+    reminder:       { label: 'Recordatorio',  color: '#d29922', dot: 'dot-yellow' },
+    suggestion:     { label: 'Sugerencia IA', color: '#a371f7', dot: 'dot-purple' },
+    roadmap_update: { label: 'Roadmap',       color: '#39c5cf', dot: 'dot-cyan' }
+  };
+
+  /* ================================================================
+     ESTADO
+     ================================================================ */
+  const state = {
+    category: 'all',
+    messages: [],
+    selection: new Set(),
+    viewMode: 'list',
+    currentDetailId: null
+  };
+
+  /* ================================================================
+     REFERENCIAS DOM
+     ================================================================ */
+  let $chips, $list, $badge, $styleInjected;
+
+  /* ================================================================
+     CSS DINAMICO (se inyecta una sola vez)
+     ================================================================ */
+  function injectMailboxCSS() {
+    if ($styleInjected) return;
+    $styleInjected = true;
+    const style = document.createElement('style');
