@@ -1,0 +1,272 @@
+/**
+ * resources.js — F2: Recursos con CRUD, filtros en tiempo real y búsqueda con debounce.
+ * Namespace: Resources
+ * Dependencias: DB (js/db.js), SVG icons (#i-youtube, #i-github, #i-recursos, #i-extlink)
+ */
+const Resources = (() => {
+  'use strict';
+
+  /* ---------- Estado ---------- */
+  const state = {
+    category: 'all',
+    phase: 'all',
+    search: '',
+    debounceTimer: null
+  };
+
+  const CATEGORIES = ['youtube', 'blog', 'docs', 'curso', 'github', 'lab', 'ingles'];
+  const PHASES = ['0', '1', '2', '3', '4', '5', '6', '7'];
+
+  /* ---------- Cache DOM ---------- */
+  let $container = null;
+  let $filterBar = null;
+  let $searchInput = null;
+  let $grid = null;
+
+  /* ---------- Utilidades ---------- */
+  const esc = (str) => {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+  };
+
+  const extractHostname = (url) => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url.split('/')[0] || '';
+    }
+  };
+
+  const nowISO = () => new Date().toISOString();
+
+  /* ---------- Favicon ---------- */
+  const getFavicon = (url) => {
+    const host = extractHostname(url);
+    return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`;
+  };
+
+  const getCategoryIcon = (category) => {
+    const map = {
+      youtube: '#i-youtube',
+      github: '#i-github'
+    };
+    return map[category] || '#i-recursos';
+  };
+
+  const getCategoryLabel = (cat) => {
+    const labels = {
+      youtube: 'YouTube',
+      blog: 'Blog',
+      docs: 'Docs',
+      curso: 'Curso',
+      github: 'GitHub',
+      lab: 'Lab',
+      ingles: 'Inglés'
+    };
+    return labels[cat] || esc(cat);
+  };
+
+  const getCategoryTagClass = (cat) => {
+    const map = {
+      youtube: 'tag tag-green',
+      blog: 'tag tag-blue',
+      docs: 'tag tag-blue',
+      curso: 'tag tag-green',
+      github: 'tag',
+      lab: 'tag',
+      ingles: 'tag tag-blue'
+    };
+    return map[cat] || 'tag';
+  };
+
+  const getLinkStatusDot = (status) => {
+    const map = {
+      ok: 'dot-green',
+      redirect: 'dot-yellow',
+      broken: 'dot-red',
+      unknown: 'dot-gray'
+    };
+    return map[status] || 'dot-gray';
+  };
+
+  const getLinkStatusLabel = (status) => {
+    const map = {
+      ok: 'OK',
+      redirect: 'Redirect',
+      broken: 'Roto',
+      unknown: 'Sin verificar'
+    };
+    return map[status] || 'Sin verificar';
+  };
+
+  /* ---------- Selección de elementos del DOM ---------- */
+  const ensureDOM = () => {
+    $container = document.getElementById('recursos');
+    if (!$container) return false;
+    $filterBar = $container.querySelector('.filter-bar');
+    $searchInput = $container.querySelector('.search-field');
+    $grid = $container.querySelector('.res-grid');
+    return true;
+  };
+
+  /* ==================== INIT ==================== */
+  const init = () => {
+    if (!ensureDOM()) return;
+    bindEvents();
+    render();
+  };
+
+  /* ---------- Eventos ---------- */
+  const bindEvents = () => {
+    /* Chips de categoría */
+    if ($filterBar) {
+      $filterBar.addEventListener('click', (e) => {
+        const chip = e.target.closest('.chip[data-category]');
+        if (chip) {
+          state.category = chip.dataset.category;
+          renderFilters();
+          render();
+          return;
+        }
+        const phaseChip = e.target.closest('.chip[data-phase]');
+        if (phaseChip) {
+          state.phase = phaseChip.dataset.phase;
+          renderFilters();
+          render();
+        }
+      });
+    }
+
+    /* Búsqueda con debounce */
+    if ($searchInput) {
+      $searchInput.addEventListener('input', (e) => {
+        const raw = e.target.value;
+        state.search = raw.trim().toLowerCase();
+        clearTimeout(state.debounceTimer);
+        state.debounceTimer = setTimeout(() => render(), 200);
+      });
+    }
+
+    /* Botón agregar recurso */
+    const $addBtn = $container.querySelector('.btn-add-resource');
+    if ($addBtn) {
+      $addBtn.addEventListener('click', showAddModal);
+    }
+
+    /* Delegación: archivar recurso */
+    if ($grid) {
+      $grid.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action="archive"]');
+        if (btn) {
+          const id = parseInt(btn.dataset.id, 10);
+          if (!Number.isNaN(id)) archiveResource(id);
+        }
+      });
+    }
+  };
+
+  /* ==================== RENDER ==================== */
+  const render = () => {
+    const items = filterData();
+    renderFilters();
+    renderGrid(items);
+  };
+
+  /* ---------- Render Filtros ---------- */
+  const renderFilters = () => {
+    if (!$filterBar) return;
+
+    const catHtml = [
+      { key: 'all', label: 'Todos' },
+      ...CATEGORIES.map(c => ({ key: c, label: getCategoryLabel(c) }))
+    ].map(item => {
+      const on = state.category === item.key ? ' is-on' : '';
+      return `<button class="chip${on}" data-category="${item.key}">${esc(item.label)}</button>`;
+    }).join('');
+
+    const phaseHtml = [
+      { key: 'all', label: 'Todas' },
+      ...PHASES.map(p => ({ key: p, label: `F${p}` }))
+    ].map(item => {
+      const on = state.phase === item.key ? ' is-on' : '';
+      return `<button class="chip chip-sm${on}" data-phase="${item.key}">${esc(item.label)}</button>`;
+    }).join('');
+
+    $filterBar.innerHTML = `
+      <div class="filter-group filter-categories">
+        ${catHtml}
+      </div>
+      <div class="filter-group filter-phases">
+        ${phaseHtml}
+      </div>
+    `;
+  };
+
+  /* ---------- Filtrar datos ---------- */
+  const filterData = () => {
+    const all = DB.data.resources || [];
+    return all.filter(item => {
+      /* No archivados */
+      if (item.status === 'archived') return false;
+
+      /* Filtro categoría */
+      if (state.category !== 'all' && item.category !== state.category) return false;
+
+      /* Filtro fase */
+      if (state.phase !== 'all' && String(item.phase) !== state.phase) return false;
+
+      /* Búsqueda de texto */
+      if (state.search) {
+        const hay = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+        if (!hay.includes(state.search)) return false;
+      }
+
+      return true;
+    });
+  };
+
+  /* ---------- Render Grid ---------- */
+  const renderGrid = (items) => {
+    if (!$grid) return;
+
+    /* Estado vacío */
+    if (!items || items.length === 0) {
+      $grid.innerHTML = `
+        <div class="empty">
+          <div class="empty-ico">
+            <svg width="48" height="48"><use href="#i-recursos"/></svg>
+          </div>
+          <p>No se encontraron recursos.</p>
+          <p class="empty-hint">Prueba ajustando los filtros o agrega un nuevo recurso.</p>
+        </div>
+      `;
+      return;
+    }
+
+    $grid.innerHTML = items.map(item => {
+      const favicon = getFavicon(item.url || '');
+      const catIcon = getCategoryIcon(item.category);
+      const catLabel = getCategoryLabel(item.category);
+      const catTagClass = getCategoryTagClass(item.category);
+      const phaseLabel = item.phase != null ? `F${item.phase}` : '';
+      const dotClass = getLinkStatusDot(item.link_status);
+      const statusLabel = getLinkStatusLabel(item.link_status);
+      const title = esc(item.title || 'Sin título');
+      const description = esc(item.description || '');
+      const url = esc(item.url || '');
+      const category = esc(item.category || '');
+
+      return `
+        <article class="res-card" data-id="${item.id}">
+          <div class="res-card-header">
+            <div class="res-logo">
+              <img src="${favicon}" alt="" loading="lazy"
+                   onerror="this.style.display='none';this.parentNode.innerHTML='<svg width=24 height=24><use href=\\'${catIcon}\\'/></svg>'">
+            </div>
+            <a href="${url}" target="_blank" rel="noopener noreferrer" class="res-title-link">
+              <h3 class="res-title">${title}</h3>
+              <svg class="res-ext" width="14" height="14"><use href="#i-extlink"/></svg>
+            </a>
+          </div>
