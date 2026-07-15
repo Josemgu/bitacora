@@ -1,0 +1,224 @@
+ _dbGetAll(STORE).filter(ev => ev.kind === 'js_error' && !ev.resolved);
+    // Ordenar por count descendente, luego por lastSeen descendente
+    return events.sort((a, b) => {
+      const diffCount = (b.count || 1) - (a.count || 1);
+      if (diffCount !== 0) return diffCount;
+      return (b.lastSeen || b.timestamp) - (a.lastSeen || a.timestamp);
+    });
+  }
+
+  /* ================================================================
+     7b. SALUD DE LA APP
+     ================================================================ */
+
+  /**
+   * Revisa cada módulo y retorna el estado general.
+   * @returns {{db:string, ai:string, links:string, queue:string, jsErrors:string}}
+   */
+  function checkAll() {
+    return {
+      db:       _checkDB(),
+      ai:       _checkAI(),
+      links:    _checkLinks(),
+      queue:    _checkQueue(),
+      jsErrors: _checkJSErrors()
+    };
+  }
+
+  /** Estado de localStorage (DB). */
+  function _checkDB() {
+    try {
+      const key = '__health_test__';
+      localStorage.setItem(key, '1');
+      localStorage.removeItem(key);
+      return 'ok';
+    } catch {
+      return 'warn';
+    }
+  }
+
+  /** Estado del proveedor IA. */
+  function _checkAI() {
+    try {
+      const cfg = JSON.parse(localStorage.getItem('ai_config') || '{}');
+      const hasProvider = !!(cfg.provider && cfg.apiKey);
+      return hasProvider ? 'ok' : 'warn';
+    } catch {
+      return 'warn';
+    }
+  }
+
+  /** Estado del verificador de links (cantidad de rotos). */
+  function _checkLinks() {
+    try {
+      const broken = _dbGetAll('links').filter(l => l.status === 'broken');
+      return broken.length === 0 ? 'ok' : 'warn';
+    } catch {
+      return 'warn';
+    }
+  }
+
+  /** Estado de la cola de aprobación. */
+  function _checkQueue() {
+    try {
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const stale = _dbGetAll('queue').filter(q => {
+        const age = Date.now() - (q.timestamp || 0);
+        return age > sevenDays;
+      });
+      return stale.length === 0 ? 'ok' : 'warn';
+    } catch {
+      return 'ok';
+    }
+  }
+
+  /** Estado de errores JS sin resolver. */
+  function _checkJSErrors() {
+    const unresolved = _dbGetAll(STORE).filter(ev => ev.kind === 'js_error' && !ev.resolved);
+    return unresolved.length === 0 ? 'ok' : 'warn';
+  }
+
+  /**
+   * Actualiza el panel de sistema (.mod-grid) con los estados actuales.
+   */
+  function renderStatus() {
+    const status = checkAll();
+
+    const modules = [
+      { key: 'db',       label: 'Base de datos',       okText: 'Conexión activa',              warnText: 'Problemas de almacenamiento' },
+      { key: 'ai',       label: 'Proveedor IA',        okText: 'Proveedor activo',             warnText: 'Sin proveedor configurado' },
+      { key: 'links',    label: 'Verificador de links', okText: 'Sin links rotos',             warnText: 'Hay links rotos' },
+      { key: 'queue',    label: 'Cola de aprobación',  okText: 'Sin pendientes antiguos',      warnText: 'Hay pendientes de >7 días' },
+      { key: 'jsErrors', label: 'Diagnóstico',         okText: 'Sin errores recientes',        warnText: 'Hay errores sin resolver' }
+    ];
+
+    const grid = document.querySelector('.mod-grid');
+    if (!grid) return;
+
+    const modEls = grid.querySelectorAll('.mod');
+
+    modules.forEach((mod, idx) => {
+      const el    = modEls[idx];
+      if (!el) return;
+
+      const state = status[mod.key];
+      const stateEl = el.querySelector('.mod-state');
+      const descEl  = el.querySelector('span');
+
+      if (stateEl) {
+        stateEl.classList.remove('ok', 'warn');
+        stateEl.classList.add(state);
+      }
+      if (descEl) {
+        descEl.textContent = state === 'ok' ? mod.okText : mod.warnText;
+      }
+    });
+  }
+
+  /**
+   * Muestra lista de eventos recientes en .activity.
+   * Formato: mensaje + timestamp relativo. Punto rojo para no resueltos.
+   */
+  function renderActivity() {
+    const list = document.querySelector('.activity');
+    if (!list) return;
+
+    const events = _dbGetAll(STORE)
+      .filter(ev => ev.kind === 'js_error')
+      .sort((a, b) => (b.lastSeen || b.timestamp) - (a.lastSeen || a.timestamp))
+      .slice(0, 20); // Últimos 20
+
+    if (events.length === 0) {
+      list.innerHTML = '<li><span>No hay eventos recientes</span></li>';
+      return;
+    }
+
+    list.innerHTML = events.map(ev => {
+      const time     = _timeAgo(ev.lastSeen || ev.timestamp);
+      const count    = ev.count > 1 ? ` <strong>(${ev.count}x)</strong>` : '';
+      const dot      = !ev.resolved
+        ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e74c3c;margin-right:6px;"></span>'
+        : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#2ecc71;margin-right:6px;"></span>';
+      const msgShort = ev.message.length > 60 ? ev.message.slice(0, 60) + '…' : ev.message;
+
+      return `<li>${dot}<span>${msgShort}${count}</span> <em>${time}</em></li>`;
+    }).join('');
+  }
+
+  /* ================================================================
+     7c. IA EXPLICA EL ERROR
+     ================================================================ */
+
+  /**
+   * Pide al proveedor de IA activo que explique un error.
+   * Muestra la explicación en un panel expandable.
+   */
+  async function explainError(errorId) {
+    const events = _dbGetAll(STORE);
+    const ev     = events.find(e => e.id === errorId || e.id == errorId);
+    if (!ev) {
+      console.warn('[Health] explainError: error no encontrado:', errorId);
+      return;
+    }
+
+    const prompt =
+      `Este error ocurrió en Bitácora (Next.js + Drizzle + Supabase).\n` +
+      `Error: ${ev.message}\n` +
+      `Stack: ${ev.stack || '(no disponible)'}\n` +
+      `Vista: ${ev.view || 'desconocida'}\n` +
+      `Explica en español: qué significa, la causa más probable y cómo arreglarlo.`;
+
+    // Buscar contenedor del panel
+    let panel = document.getElementById('health-explain-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'health-explain-panel';
+      panel.className = 'health-explain-panel';
+      panel.innerHTML = `
+        <div class="explain-header">
+          <strong>Explicación del error</strong>
+          <button class="explain-close" aria-label="Cerrar">×</button>
+        </div>
+        <div class="explain-body"><p class="explain-loading">Consultando IA…</p></div>
+      `;
+      document.body.appendChild(panel);
+      panel.querySelector('.explain-close').addEventListener('click', () => {
+        panel.classList.remove('open');
+      });
+    }
+
+    panel.classList.add('open');
+    const body = panel.querySelector('.explain-body');
+    body.innerHTML = '<p class="explain-loading">Consultando IA…</p>';
+
+    // Invocar proveedor IA a través del namespace global AI si existe
+    try {
+      let explanation = null;
+
+      if (typeof AI !== 'undefined' && AI.ask) {
+        explanation = await AI.ask(prompt);
+      } else if (typeof AI !== 'undefined' && AI.complete) {
+        explanation = await AI.complete(prompt);
+      } else {
+        // Fallback: intentar fetch directo si hay configuración
+        const cfg = JSON.parse(localStorage.getItem('ai_config') || '{}');
+        if (cfg.provider && cfg.apiKey && cfg.apiUrl) {
+          const resp = await fetch(cfg.apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${cfg.apiKey}`
+            },
+            body: JSON.stringify({
+              model: cfg.model || 'gpt-4',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.3
+            })
+          });
+          const data = await resp.json();
+          explanation = data.choices?.[0]?.message?.content
+                     || data.message?.content
+                     || data.text
+                     || '(Sin respuesta de la IA)';
+        } else {
+          explanation = 'No hay proveedor de IA configurado. Configura uno en Ajustes → I

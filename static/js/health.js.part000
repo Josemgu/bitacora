@@ -1,0 +1,256 @@
+/**
+ * health.js — F7: Diagnóstico de errores para Bitácora
+ * JavaScript vanilla (ES6+), sin frameworks.
+ * Expone namespace global `Health`.
+ *
+ * Dependencias:
+ *   - DB (namespace de js/db.js)
+ *
+ * Uso:
+ *   Health.init()            → Inicializa captura de errores y panel
+ *   Health.checkAll()        → Diagnóstico completo de la app
+ *   Health.renderStatus()    → Actualiza grid de módulos
+ *   Health.renderActivity()  → Lista de eventos recientes
+ *   Health.explainError(id)  → Pide a la IA que explique un error
+ *   Health.resolveError(id)  → Marca error como resuelto
+ *   Health.clearOldErrors(d) → Limpia errores antiguos
+ *   Health.startMonitoring() → Monitoreo periódico cada 30 s
+ *   Health.stopMonitoring()  → Detiene monitoreo
+ */
+
+const Health = (() => {
+  'use strict';
+
+  /* ================================================================
+     CONFIGURACIÓN Y ESTADO INTERNO
+     ================================================================ */
+  const STORE       = 'health_events';
+  const MONITOR_MS  = 30_000;   // 30 segundos
+  let monitorId     = null;     // ID del setInterval
+  let initialized   = false;
+
+  /* ================================================================
+     UTILIDADES
+     ================================================================ */
+
+  /**
+   * Genera un hash simple (FNV-1a) para agrupar errores idénticos.
+   */
+  function _hash(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
+
+  /**
+   * Normaliza un mensaje de error quitando URLs, timestamps y valores variables.
+   */
+  function _normalizeMessage(msg) {
+    if (!msg) return 'Error desconocido';
+    return String(msg)
+      .replace(/https?:\/\/[^\s]+/g, '<url>')
+      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[\d.Z]*/g, '<ts>')
+      .replace(/'[^']*'/g, "'<val>'")
+      .replace(/`[^`]*`/g, '`<val>`')
+      .trim();
+  }
+
+  /**
+   * Normaliza un stack trace manteniendo solo las líneas de código del usuario.
+   */
+  function _normalizeStack(error) {
+    if (!error || !error.stack) return '';
+    return error.stack
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.includes('/node_modules/'))
+      .join('\n');
+  }
+
+  /**
+   * Calcula un hash de agrupación a partir de mensaje + stack.
+   */
+  function _groupHash(message, stack) {
+    return _hash(_normalizeMessage(message) + '|' + (stack || ''));
+  }
+
+  /**
+   * Timestamp relativo humano: "hace 2h", "hace 3d", etc.
+   */
+  function _timeAgo(ts) {
+    const diff = Date.now() - ts;
+    const s    = Math.floor(diff / 1000);
+    if (s < 60)   return 'hace un momento';
+    if (s < 3600) return `hace ${Math.floor(s / 60)}m`;
+    if (s < 86400)return `hace ${Math.floor(s / 3600)}h`;
+    const d = Math.floor(s / 86400);
+    return d < 30 ? `hace ${d}d` : `hace ${Math.floor(d / 30)}m`;
+  }
+
+  /**
+   * Wrapper seguro para invocar DB.getAll / DB.add / DB.update / DB.delete.
+   */
+  function _dbGetAll(store) {
+    try { return DB.getAll(store); } catch (e) { return []; }
+  }
+  function _dbAdd(store, item) {
+    try { return DB.add(store, item); } catch (e) { return null; }
+  }
+  function _dbUpdate(store, id, changes) {
+    try { return DB.update(store, id, changes); } catch (e) { return false; }
+  }
+  function _dbDelete(store, id) {
+    try { return DB.delete(store, id); } catch (e) { return false; }
+  }
+
+  /* ================================================================
+     7a. ERRORES DE JS DEL CLIENTE
+     ================================================================ */
+
+  /**
+   * Inicializa el sistema de diagnóstico.
+   * Registra window.onerror y window.onunhandledrejection.
+   */
+  function init() {
+    if (initialized) return;
+    initialized = true;
+
+    window.addEventListener('error', (e) => {
+      captureError(e.message, e.filename, e.lineno, e.colno, e.error);
+    });
+
+    window.addEventListener('unhandledrejection', (e) => {
+      captureRejection(e);
+    });
+
+    // Auto-limpieza al iniciar
+    clearOldErrors(30);
+  }
+
+  /**
+   * Captura un error de JavaScript, normaliza, agrupa y guarda.
+   */
+  function captureError(message, source, lineno, colno, error) {
+    const stack    = _normalizeStack(error);
+    const normMsg  = _normalizeMessage(message);
+    const gHash    = _groupHash(normMsg, stack);
+
+    const events   = _dbGetAll(STORE);
+
+    // Buscar si ya existe un evento con el mismo hash y sin resolver
+    const existing = events.find(ev =>
+      ev.kind === 'js_error' &&
+      ev.groupHash === gHash &&
+      !ev.resolved
+    );
+
+    if (existing) {
+      // Incrementar contador y actualizar última ocurrencia
+      existing.count      = (existing.count || 1) + 1;
+      existing.lastSeen   = Date.now();
+      existing.occurrences = [...(existing.occurrences || [existing.timestamp]), Date.now()];
+      // Actualizar source/lineno si cambió
+      existing.source     = source || existing.source;
+      existing.lineno     = lineno || existing.lineno;
+      existing.colno      = colno || existing.colno;
+      _dbUpdate(STORE, existing.id, existing);
+    } else {
+      const healthEvent = {
+        kind:          'js_error',
+        message:       normMsg,
+        rawMessage:    message || '',
+        source:        source  || '',
+        lineno:        lineno  || 0,
+        colno:         colno   || 0,
+        stack:         stack,
+        groupHash:     gHash,
+        count:         1,
+        timestamp:     Date.now(),
+        lastSeen:      Date.now(),
+        occurrences:   [Date.now()],
+        resolved:      false,
+        resolvedAt:    null,
+        view:          document.title || window.location.pathname,
+        userAgent:     navigator.userAgent
+      };
+      _dbAdd(STORE, healthEvent);
+    }
+
+    // Actualizar panel sin recargar la página
+    renderStatus();
+    renderActivity();
+  }
+
+  /**
+   * Captura un unhandled promise rejection.
+   */
+  function captureRejection(event) {
+    let message = 'Unhandled Promise Rejection';
+    let stack   = '';
+
+    if (event.reason) {
+      if (typeof event.reason === 'string') {
+        message = event.reason;
+      } else if (event.reason instanceof Error) {
+        message = event.reason.message || message;
+        stack   = _normalizeStack(event.reason);
+      } else {
+        try {
+          message = JSON.stringify(event.reason);
+        } catch {
+          message = 'Promise rejected with non-serializable value';
+        }
+      }
+    }
+
+    const normMsg = _normalizeMessage(message);
+    const gHash   = _groupHash(normMsg, stack);
+    const events  = _dbGetAll(STORE);
+
+    const existing = events.find(ev =>
+      ev.kind === 'js_error' &&
+      ev.groupHash === gHash &&
+      !ev.resolved
+    );
+
+    if (existing) {
+      existing.count       = (existing.count || 1) + 1;
+      existing.lastSeen    = Date.now();
+      existing.occurrences = [...(existing.occurrences || [existing.timestamp]), Date.now()];
+      _dbUpdate(STORE, existing.id, existing);
+    } else {
+      const healthEvent = {
+        kind:          'js_error',
+        message:       normMsg,
+        rawMessage:    message,
+        source:        '',
+        lineno:        0,
+        colno:         0,
+        stack:         stack,
+        groupHash:     gHash,
+        count:         1,
+        timestamp:     Date.now(),
+        lastSeen:      Date.now(),
+        occurrences:   [Date.now()],
+        resolved:      false,
+        resolvedAt:    null,
+        view:          document.title || window.location.pathname,
+        userAgent:     navigator.userAgent
+      };
+      _dbAdd(STORE, healthEvent);
+    }
+
+    renderStatus();
+    renderActivity();
+
+    // No prevenir el comportamiento por defecto para que el error siga visible en consola
+  }
+
+  /**
+   * Retorna errores agrupados con contador, ordenados por frecuencia (más comunes primero).
+   */
+  function getErrorGroups() {
+    const events =
