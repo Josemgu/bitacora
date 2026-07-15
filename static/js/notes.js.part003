@@ -1,0 +1,104 @@
+      });
+    }
+
+    // Boton guardar
+    if ($btnSave) {
+      $btnSave.addEventListener('click', () => {
+        saveNote();
+      });
+    }
+
+    // Boton eliminar
+    if ($btnDelete) {
+      $btnDelete.addEventListener('click', () => {
+        deleteNote();
+      });
+    }
+
+    // Auto-detectar cambios en inputs
+    const markDirty = () => { state.isDirty = true; };
+    if ($titleInput) $titleInput.addEventListener('input', markDirty);
+    if ($contentInput) $contentInput.addEventListener('input', markDirty);
+
+    // Atajo de teclado Ctrl+S para guardar
+    document.addEventListener('keydown', (e) => {
+      // Solo actuar si la vista de notas esta activa
+      const $view = qs('#view-notes');
+      if (!$view || $view.style.display === 'none') return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (state.activeId) saveNote();
+      }
+    });
+  }
+
+  /* ================================================================
+     INIT
+   ================================================================ */
+  function init() {
+    try {
+      // Cachear referencias DOM
+      $btnNew        = qs('#btn-new-note');
+      $sidebar       = qs('#notes-sidebar-list');
+      $editorPanel   = qs('#notes-editor-panel');
+      $emptyPanel    = qs('#notes-empty-panel');
+      $titleInput    = qs('#note-title-input');
+      $contentInput  = qs('#note-content-input');
+      $btnSave       = qs('#btn-save-note');
+      $btnDelete     = qs('#btn-delete-note');
+
+      // Crear indicador de guardado si no existe
+      $saveIndicator = qs('#notes-save-indicator');
+      if (!$saveIndicator && $editorPanel) {
+        $saveIndicator = document.createElement('span');
+        $saveIndicator.id = 'notes-save-indicator';
+        $saveIndicator.style.cssText = 'font-size:0.75rem;color:var(--text-3,#9ca3af);margin-left:auto;transition:opacity 0.3s ease;';
+
+        // Insertar en el panel-head del editor si existe
+        const $panelHead = qs('.panel-head', $editorPanel);
+        if ($panelHead) {
+          $panelHead.style.display = 'flex';
+          $panelHead.style.alignItems = 'center';
+          $panelHead.style.gap = '8px';
+          $panelHead.appendChild($saveIndicator);
+        }
+      }
+
+      // Ocultar editor por defecto, mostrar empty
+      if ($editorPanel) $editorPanel.style.display = 'none';
+
+      // Cargar datos
+      seedIfEmpty();
+      state.notes = getNotesFromDB();
+
+      // Render sidebar
+      renderSidebar();
+
+      // Iniciar auto-guardado
+      startAutoSaveTimer();
+
+      // Bind eventos
+      bindEvents();
+    } catch (err) {
+      console.error('[Notes] init error:', err);
+    }
+  }
+
+  /* ================================================================
+     EXPOSE
+   ================================================================ */
+  return {
+    init,
+    renderSidebar,
+    openNote,
+    createNote,
+    saveNote,
+    deleteNote,
+    autoSave,
+    formatDate,
+    getNotesFromDB,
+    hasUnsavedChanges,
+    state
+  };
+})();
