@@ -1,0 +1,105 @@
+  style.id = 'messages-mailbox-css';
+    style.textContent = `
+      .mailbox-summary { display:flex; align-items:center; gap:16px; padding:14px 18px; background:var(--card); border:1px solid var(--border); border-radius:10px; margin-bottom:16px; }
+      .mailbox-summary-progress { flex:1; }
+      .mailbox-summary-progress-head { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--text-dim); margin-bottom:6px; }
+      .mailbox-summary-progress-head strong { font-family:var(--mono); font-size:14px; color:var(--green); }
+      .mailbox-summary-info { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+      .mailbox-summary-info .btn { white-space:nowrap; }
+      .mailbox-unread-count { font-size:13px; color:var(--text-dim); }
+      .mailbox-unread-count strong { color:var(--text); font-family:var(--mono); }
+      .mailbox-list { display:flex; flex-direction:column; gap:2px; }
+      .mail-item { display:grid; grid-template-columns:32px 1fr auto; align-items:center; gap:12px; padding:12px 16px; border-radius:8px; cursor:pointer; transition:background .15s; border:1px solid transparent; }
+      .mail-item:hover { background:var(--card); border-color:var(--border); }
+      .mail-item.unread { background:rgba(88,166,255,0.04); }
+      .mail-item.unread .mail-subject { font-weight:600; color:var(--text); }
+      .mail-checkbox-col { display:flex; align-items:center; justify-content:center; }
+      .mail-checkbox { width:16px; height:16px; cursor:pointer; accent-color:var(--green); }
+      .mail-meta { min-width:0; }
+      .mail-sender-row { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted, var(--text-faint)); margin-bottom:3px; }
+      .mail-sender-icon { color:var(--blue); display:flex; align-items:center; }
+      .mail-subject-row { display:flex; align-items:center; gap:8px; margin-bottom:2px; }
+      .mail-subject { font-size:13px; color:var(--text-secondary, var(--text-dim)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .mail-preview { font-size:12px; color:var(--muted, var(--text-faint)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .mail-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0; }
+      .mail-date { font-size:11px; color:var(--muted, var(--text-faint)); white-space:nowrap; }
+      .mail-dot { width:8px; height:8px; border-radius:50%; background:var(--blue); }
+      .mail-dot.read { background:transparent; }
+      .mail-kind-tag { font-family:var(--mono); font-size:9.5px; padding:1px 6px; border-radius:4px; border:1px solid var(--border); color:var(--text-faint); }
+      .mail-detail { padding:20px; }
+      .mail-detail-header { margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+      .mail-detail-sender { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted, var(--text-faint)); margin-bottom:8px; }
+      .mail-detail-sender-icon { color:var(--blue); }
+      .mail-detail-subject { font-size:18px; font-weight:700; margin-bottom:8px; }
+      .mail-detail-date { font-size:12px; color:var(--muted, var(--text-faint)); }
+      .mail-detail-body { font-size:14px; line-height:1.7; color:var(--text-secondary, var(--text-dim)); }
+      .mail-actions { display:flex; gap:10px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); flex-wrap:wrap; }
+      .mail-bulk-bar { display:none; align-items:center; gap:10px; padding:10px 16px; background:var(--card); border:1px solid var(--border); border-radius:8px; margin-bottom:10px; }
+      .mail-bulk-bar.active { display:flex; }
+      .mail-bulk-bar .btn-sm { height:28px; padding:0 10px; font-size:11.5px; }
+      .mail-bulk-count { font-size:12px; color:var(--text-dim); }
+      .mail-back-btn { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--blue); background:none; border:none; cursor:pointer; margin-bottom:12px; padding:0; }
+      .mail-back-btn:hover { color:var(--green); }
+      .mailbox-empty .empty { padding:40px 24px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  /* ================================================================
+     HELPERS DOM
+     ================================================================ */
+  function qs(selector, context) {
+    return (context || document).querySelector(selector);
+  }
+
+  function qsa(selector, context) {
+    return (context || document).querySelectorAll(selector);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /* ================================================================
+     FORMATO DE FECHA RELATIVA
+     ================================================================ */
+  function formatDate(dateInput) {
+    const date = new Date(dateInput);
+    const now = Date.now();
+    const diffMs = now - date.getTime();
+    const diffMin = Math.floor(diffMs / (1000 * 60));
+    const diffHr  = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMin < 1) return 'Ahora';
+    if (diffMin < 60) return `Hace ${diffMin}m`;
+    if (diffHr < 24) return `Hace ${diffHr}h`;
+    if (diffDay === 1) return 'Ayer';
+    if (diffDay < 7) return `Hace ${diffDay}d`;
+    return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function formatExactDate(dateInput) {
+    const date = new Date(dateInput);
+    return date.toLocaleDateString('es-ES', {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  /* ================================================================
+     SVG ICONS
+     ================================================================ */
+  function svgIcon(name, size) {
+    const s = size || 16;
+    const icons = {
+      busqueda: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+      info: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+      agregar: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
