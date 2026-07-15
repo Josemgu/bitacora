@@ -1,0 +1,198 @@
+      $wrap.innerHTML = '<div class="panel" style="padding:1rem;color:#64748b;">No hay cambios para importar.</div>';
+      $wrap.style.display = 'block';
+      return;
+    }
+
+    let summaryHtml = '';
+    let totalNew = 0;
+    let totalUpdated = 0;
+    for (const t of tables) {
+      const d = diff[t];
+      totalNew += d.new;
+      totalUpdated += d.updated;
+      summaryHtml += `<li style="margin-bottom:0.25rem;"><strong>${esc(t)}</strong>: ${d.new > 0 ? d.new + ' nuevos' : ''}${d.new > 0 && d.updated > 0 ? ', ' : ''}${d.updated > 0 ? d.updated + ' actualizados' : ''}</li>`;
+    }
+
+    $wrap.style.display = 'block';
+    $wrap.innerHTML = `
+      <div class="panel" style="padding:1rem;">
+        <h4 style="margin:0 0 0.5rem;font-size:1rem;color:#e2e8f0;">Resumen de importacion</h4>
+        <p style="margin:0 0 0.5rem;color:#94a3b8;font-size:0.875rem;">
+          ${totalNew} registros nuevos, ${totalUpdated} actualizados:
+        </p>
+        <ul style="color:#cbd5e1;font-size:0.875rem;margin:0 0 1rem;padding-left:1.25rem;">
+          ${summaryHtml}
+        </ul>
+        <div style="display:flex;gap:0.5rem;">
+          <button id="cfg-import-confirm" class="btn btn-primary">Confirmar importacion</button>
+          <button id="cfg-import-cancel" class="btn btn-ghost">Cancelar</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('cfg-import-confirm')?.addEventListener('click', () => {
+      if (!state.importData) return;
+      const ok = DB.importAll(state.importData);
+      if (ok) {
+        alert('Importacion completada exitosamente.');
+        state.importData = null;
+        state.importDiff = null;
+        $wrap.style.display = 'none';
+        $wrap.innerHTML = '';
+        // Recargar datos en UI
+        renderProviders();
+        AIChat.loadProviders();
+        AIChat.renderProviderSelector();
+      } else {
+        alert('Error al importar los datos.');
+      }
+    });
+
+    document.getElementById('cfg-import-cancel')?.addEventListener('click', () => {
+      state.importData = null;
+      state.importDiff = null;
+      $wrap.style.display = 'none';
+      $wrap.innerHTML = '';
+    });
+  }
+
+  /* ═════════════════════════════  9d. ZONA DE PELIGRO  ═════════════════════════════ */
+
+  /** Renderiza el panel de zona de peligro. */
+  function renderDangerZone() {
+    const $wrap = document.getElementById('cfg-danger');
+    if (!$wrap) return;
+
+    $wrap.innerHTML = `
+      <div class="panel" style="padding:1rem;border:1px solid #ef4444;">
+        <p style="margin:0 0 0.75rem;color:#fca5a5;font-size:0.875rem;">
+          Elimina TODOS los datos y vuelve al estado inicial. Esta accion no se puede deshacer.
+        </p>
+        <button id="cfg-delete-all" class="btn btn-danger">Eliminar todo</button>
+
+        <div id="cfg-delete-modal" style="display:none;margin-top:1rem;padding:1rem;background:#1e293b;border-radius:0.5rem;">
+          <p style="margin:0 0 0.75rem;color:#fca5a5;font-size:0.875rem;">
+            Para confirmar, escribe <strong>ELIMINAR</strong> a continuacion. Se recomienda exportar los datos antes.
+          </p>
+          <input id="cfg-delete-confirm-input" class="input" placeholder="Escribe ELIMINAR" style="width:100%;margin-bottom:0.75rem;">
+          <div style="display:flex;gap:0.5rem;">
+            <button id="cfg-delete-confirm-btn" class="btn btn-danger" disabled>Si, eliminar todo</button>
+            <button id="cfg-delete-cancel" class="btn btn-ghost">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('cfg-delete-all')?.addEventListener('click', () => {
+      const $modal = document.getElementById('cfg-delete-modal');
+      if ($modal) $modal.style.display = 'block';
+    });
+
+    document.getElementById('cfg-delete-cancel')?.addEventListener('click', () => {
+      _closeDeleteModal();
+    });
+
+    document.getElementById('cfg-delete-confirm-input')?.addEventListener('input', (e) => {
+      const btn = document.getElementById('cfg-delete-confirm-btn');
+      if (btn) btn.disabled = e.target.value !== 'ELIMINAR';
+    });
+
+    document.getElementById('cfg-delete-confirm-btn')?.addEventListener('click', () => {
+      const input = document.getElementById('cfg-delete-confirm-input');
+      if (!input || input.value !== 'ELIMINAR') return;
+
+      try {
+        DB.reset();
+        // Limpiar historial de chat tambien
+        localStorage.removeItem('bitacora_ai_chat_history');
+        alert('Todos los datos han sido eliminados. La pagina se recargara.');
+        window.location.reload();
+      } catch (err) {
+        alert('Error al eliminar los datos: ' + err.message);
+      }
+    });
+  }
+
+  /** Cierra el modal de eliminacion. @private */
+  function _closeDeleteModal() {
+    const $modal = document.getElementById('cfg-delete-modal');
+    const $input = document.getElementById('cfg-delete-confirm-input');
+    const $btn = document.getElementById('cfg-delete-confirm-btn');
+    if ($modal) $modal.style.display = 'none';
+    if ($input) $input.value = '';
+    if ($btn) $btn.disabled = true;
+  }
+
+  /* ═════════════════════════════  9b. APARIENCIA  ═════════════════════════════ */
+
+  /** Renderiza la seccion de apariencia (tema y color de acento). */
+  function renderAppearance() {
+    const $wrap = document.getElementById('cfg-appearance');
+    if (!$wrap) return;
+
+    const currentTheme = document.documentElement.dataset.theme || 'dark';
+    const themeLabel = currentTheme === 'light' ? 'Claro' : 'Oscuro';
+    const themeIcon = currentTheme === 'light'
+      ? '<svg class="ico" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>'
+      : '<svg class="ico" style="width:16px;height:16px;" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+    const currentAccent = localStorage.getItem('bitacora_accent') || '#3fb950';
+
+    let accentButtonsHtml = '';
+    ACCENT_COLORS.forEach(c => {
+      const isActive = c.hex === currentAccent ? 'is-active' : '';
+      accentButtonsHtml += `<button class="accent-btn ${isActive}" data-color="${c.hex}" title="${c.name}" onclick="Config.setAccent('${c.hex}')"></button>`;
+    });
+
+    $wrap.innerHTML = `
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <span style="font-size:0.875rem;color:#94a3b8;min-width:100px;">Tema</span>
+        <button id="cfg-theme-toggle" class="theme-toggle" onclick="Config.toggleTheme()">
+          ${themeIcon}
+          <span>${themeLabel}</span>
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <span style="font-size:0.875rem;color:#94a3b8;min-width:100px;">Color primario</span>
+        <div class="accent-picker">
+          ${accentButtonsHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  /** Cambia entre tema oscuro y claro. */
+  function toggleTheme() {
+    const current = document.documentElement.dataset.theme || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('bitacora_theme', next);
+    renderAppearance();
+  }
+
+  /** Cambia el color de acento primario. */
+  function setAccent(color) {
+    document.documentElement.style.setProperty('--green', color);
+    document.documentElement.style.setProperty('--green-dim', color);
+    document.documentElement.style.setProperty('--accent-green', color);
+    localStorage.setItem('bitacora_accent', color);
+    renderAppearance();
+  }
+
+  /* ═════════════════════════════  API PUBLICA  ═════════════════════════════ */
+
+  return {
+    init,
+    render,
+    renderProviders,
+    showAddProvider,
+    renderActionButtons,
+    exportData,
+    importData,
+    renderDangerZone,
+    renderAppearance,
+    toggleTheme,
+    setAccent
+  };
+
+})();
