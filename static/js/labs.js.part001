@@ -1,0 +1,164 @@
+ class="empty-hint">No se encontraron laboratorios con los filtros activos.</p>
+        <button class="btn btn-sm btn-ghost" id="labs-clear-filters">Limpiar filtros</button>
+      </div>
+    `;
+  }
+
+  function renderGrid(items) {
+    if (!$grid) return;
+
+    if (!items || items.length === 0) {
+      $grid.innerHTML = renderEmpty();
+      bindClearFilters();
+      return;
+    }
+
+    const html = items.map(lab => {
+      const platLabel = escapeHtml(getPlatformLabel(lab.platform));
+      const platColor = getPlatformColor(lab.platform);
+      const diffMeta  = getDifficultyMeta(lab.difficulty);
+      const freeTag   = lab.is_free
+        ? '<span class="tag tag-green">Gratis</span>'
+        : '<span class="tag">Premium</span>';
+
+      return `
+        <div class="res-card" data-id="${lab.id}" data-platform="${escapeHtml(lab.platform)}">
+          <div class="res-top">
+            <div class="res-logo" style="background:var(--${platColor})">
+              <span class="mono" style="color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;">
+                ${platLabel.substring(0, 3)}
+              </span>
+            </div>
+            <div class="res-ext">
+              <svg class="ico" style="width:14px;height:14px;opacity:.5;"><use href="#i-externo"></use></svg>
+            </div>
+          </div>
+          <h4 style="margin:8px 0 4px;font-size:14px;font-weight:600;color:var(--text);">
+            ${escapeHtml(lab.title)}
+          </h4>
+          <p style="margin:0 0 10px;font-size:12px;color:var(--text-sec);line-height:1.4;">
+            ${escapeHtml(lab.description)}
+          </p>
+          <div class="chip-row" style="gap:6px;">
+            <span class="chip chip-sm" style="background:var(--${platColor})22;color:var(--${platColor});border-color:var(--${platColor})44;">
+              ${platLabel}
+            </span>
+            <span class="chip chip-sm">
+              <span class="dot ${diffMeta.dot}"></span>
+              ${escapeHtml(diffMeta.label)}
+            </span>
+            ${freeTag}
+          </div>
+          <a href="${escapeHtml(lab.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary" style="margin-top:10px;width:100%;text-align:center;"
+             onclick="Labs.openLab('${escapeHtml(lab.url)}');return false;">
+            <svg class="ico" style="width:12px;height:12px;margin-right:4px;"><use href="#i-externo"></use></svg>
+            Abrir Lab
+          </a>
+        </div>
+      `;
+    }).join('');
+
+    $grid.innerHTML = `<div class="res-grid">${html}</div>`;
+  }
+
+  function renderPlatformChips() {
+    if (!$chips) return;
+
+    const platforms = ['all', ...new Set(LABS_DATA.map(l => l.platform))];
+    const labels = { all: 'Todas' };
+
+    const html = platforms.map(p => {
+      const label = labels[p] || getPlatformLabel(p);
+      const isOn  = state.platform === p ? 'is-on' : '';
+      return `<button class="chip ${isOn}" data-platform="${p}">${escapeHtml(label)}</button>`;
+    }).join('');
+
+    $chips.innerHTML = html;
+  }
+
+  function render() {
+    renderPlatformChips();
+    const filtered = filterLabs();
+    renderGrid(filtered);
+  }
+
+  /* ═══════════════════════════════════════════
+     Actions
+     ═══════════════════════════════════════════ */
+
+  function openLab(url) {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function clearFilters() {
+    state.filterText = '';
+    state.platform   = 'all';
+    if ($search) $search.value = '';
+    render();
+  }
+
+  /* ═══════════════════════════════════════════
+     Event bindings
+     ═══════════════════════════════════════════ */
+
+  function bindClearFilters() {
+    const $clearBtn = $grid?.querySelector('#labs-clear-filters');
+    if ($clearBtn) {
+      $clearBtn.addEventListener('click', clearFilters);
+    }
+  }
+
+  function bindEvents() {
+    if (!$search || !$chips) return;
+
+    /* Search */
+    $search.addEventListener('input', (e) => {
+      state.filterText = e.target.value;
+      const filtered = filterLabs();
+      renderGrid(filtered);
+    });
+
+    /* Platform chips */
+    $chips.addEventListener('click', (e) => {
+      const $chip = e.target.closest('.chip[data-platform]');
+      if (!$chip) return;
+
+      state.platform = $chip.dataset.platform;
+      render();
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+     Init
+     ═══════════════════════════════════════════ */
+
+  function init() {
+    try {
+      $view   = document.getElementById('view-labs');
+      $search = document.getElementById('labs-search');
+      $chips  = document.getElementById('labs-platform-chips');
+      $grid   = document.getElementById('labs-grid');
+
+      if (!$grid) {
+        console.warn('[Labs] #labs-grid no encontrado. Render omitido.');
+        return;
+      }
+
+      render();
+      bindEvents();
+    } catch (err) {
+      console.error('[Labs] Error en init:', err);
+    }
+  }
+
+  /* ── Public API ── */
+  return {
+    init,
+    render,
+    filterLabs,
+    renderGrid,
+    getPlatformColor,
+    getPlatformLabel,
+    openLab
+  };
+})();
