@@ -1,0 +1,222 @@
+/**
+ * ============================================================================
+ * roadmap.js — F1: Roadmap Interactivo
+ * ============================================================================
+ * Maneja la vista de roadmap: spine con nodos, phase-strip, progresos,
+ * y la interaccion de temas (cycle todo/current/done).
+ *
+ * Namespace global: Roadmap
+ * Depende de: DB (db.js), App.updateProgress() (app.js)
+ * ============================================================================
+ */
+
+var Roadmap = (function () {
+    'use strict';
+
+    /* ──────────────────────── constantes ──────────────────────── */
+
+    /** Total de temas en todo el roadmap (seed.js tiene 28). */
+    var TOTAL_TOPICS = 28;
+
+    /** IDs de elementos DOM */
+    var SELECTORS = {
+        spineNodes: '.spine-nodes',
+        spineFill:  '.spine-fill',
+        phaseStrip: '.phase-strip',
+        view:       '#view-roadmap'
+    };
+
+    /* ──────────────────────── estado interno ──────────────────────── */
+
+    /** Cache de elementos DOM */
+    var _els = {};
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       INICIALIZACION
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Inicializa la vista de roadmap.
+     * Lee phases y topics de DB, renderiza el spine y la phase-strip,
+     * calcula progresos y expande la fase actual.
+     */
+    function init() {
+        _cacheDOM();
+        render();
+        _attachEventListeners();
+    }
+
+    /**
+     * Cache de elementos DOM frecuentemente usados.
+     * @private
+     */
+    function _cacheDOM() {
+        var view = document.querySelector(SELECTORS.view);
+        if (!view) return;
+        _els.spineNodes = view.querySelector(SELECTORS.spineNodes);
+        _els.spineFill  = view.querySelector(SELECTORS.spineFill);
+        _els.phaseStrip = view.querySelector(SELECTORS.phaseStrip);
+        _els.view       = view;
+    }
+
+    /**
+     * Adjunta event listeners delegados para interaccion.
+     * @private
+     */
+    function _attachEventListeners() {
+        if (!_els.spineNodes) return;
+
+        _els.spineNodes.addEventListener('click', function (e) {
+            // Ignorar clicks en checkboxes (ya manejados por Subtopics)
+            if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') {
+                return;
+            }
+
+            // Click en topic header -> toggle expand/colapsar subtemas
+            var topicHeader = e.target.closest('.topic-header');
+            if (topicHeader) {
+                var topicEl = topicHeader.closest('.topic');
+                if (topicEl && topicEl.dataset.topicId) {
+                    _toggleTopicSubtopics(parseInt(topicEl.dataset.topicId, 10));
+                    return;
+                }
+            }
+
+            // Click en el topic completo (fallback si no es header) -> toggle
+            var topicEl = e.target.closest('.topic');
+            if (topicEl && topicEl.dataset.topicId && !e.target.closest('.subtopic-item')) {
+                _toggleTopicSubtopics(parseInt(topicEl.dataset.topicId, 10));
+                return;
+            }
+
+            // Click en el head de la card -> toggle expand/colapsar fase
+            var nodeHead = e.target.closest('.node-head');
+            if (nodeHead) {
+                var nodeCard = nodeHead.closest('.node-card');
+                if (nodeCard && nodeCard.dataset.phaseId) {
+                    toggleNode(parseInt(nodeCard.dataset.phaseId, 10));
+                }
+            }
+        });
+    }
+
+    /**
+     * Expande o colapsa los subtemas de un topic.
+     * @param {number} topicId — ID del topic
+     * @private
+     */
+    function _toggleTopicSubtopics(topicId) {
+        if (!_els.spineNodes) return;
+
+        var subtopicList = _els.spineNodes.querySelector(
+            '[data-topic-subtopics="' + topicId + '"] .subtopic-list'
+        );
+        if (!subtopicList) return;
+
+        var topicEl = _els.spineNodes.querySelector('.topic[data-topic-id="' + topicId + '"]');
+        var chevron = topicEl ? topicEl.querySelector('.topic-chevron') : null;
+
+        var isExpanded = subtopicList.classList.contains('is-expanded');
+
+        if (isExpanded) {
+            subtopicList.classList.remove('is-expanded');
+            if (chevron) chevron.classList.remove('is-expanded');
+        } else {
+            subtopicList.classList.add('is-expanded');
+            if (chevron) chevron.classList.add('is-expanded');
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       RENDER PRINCIPAL
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Renderiza completo el roadmap: nodos, strip, spine y progresos.
+     */
+    function render() {
+        if (!_els.spineNodes || !_els.phaseStrip) {
+            _cacheDOM();
+        }
+
+        var phases = DB.getAll('phases');
+        var topics = DB.getAll('topics');
+
+        // Ordenar fases por index
+        phases.sort(function (a, b) { return a.index - b.index; });
+
+        // Renderizar spine (nodos)
+        _renderSpineNodes(phases, topics);
+
+        // Renderizar phase-strip
+        _renderPhaseStrip(phases, topics);
+
+        // Calcular y aplicar progresos
+        var progress = calculateProgress();
+        _applyProgress(progress);
+
+        // Expandir la fase actual, colapsar las demas
+        _setInitialExpansion(phases, topics);
+    }
+
+    /**
+     * Renderiza los nodos del spine.
+     * @param {Array} phases — lista de fases ordenadas
+     * @param {Array} topics — lista de todos los topics
+     * @private
+     */
+    function _renderSpineNodes(phases, topics) {
+        if (!_els.spineNodes) return;
+
+        var html = '';
+
+        phases.forEach(function (phase) {
+            var phaseTopics = topics.filter(function (t) { return t.phase_id === phase.id; });
+            phaseTopics.sort(function (a, b) { return a.order - b.order; });
+
+            var phaseState = _getPhaseState(phaseTopics);
+            var stateClass = phaseState === 'done' ? 'state-done' :
+                             phaseState === 'current' ? 'state-current' : '';
+
+            // Formato de fecha para mostrar
+            var whenLabel = _formatWhen(phase);
+
+            // Topics HTML
+            var topicsHtml = _renderTopicsList(phaseTopics);
+
+            // Proyectos de esta fase
+            var projectsHtml = _renderPhaseProjects(phase.id);
+
+            // Pulse para fase actual
+            var pulseHtml = stateClass === 'state-current' ? '<i class="pulse"></i>' : '';
+
+            html +=
+                '<article class="node ' + stateClass + '" data-phase-id="' + phase.id + '" style="--accent:' + phase.accent + '">\n' +
+                '  <div class="node-dot">' + pulseHtml + '</div>\n' +
+                '  <div class="node-card" data-phase-id="' + phase.id + '">\n' +
+                '    <div class="node-head">\n' +
+                '      <span class="node-idx">FASE ' + phase.index + '</span>\n' +
+                '      <span class="node-when">' + whenLabel + '</span>\n' +
+                '    </div>\n' +
+                '    <h3>' + _esc(phase.title) + '</h3>\n' +
+                '    <p>' + _esc(phase.description) + '</p>\n' +
+                '    <ul class="topic-list">' + topicsHtml + '</ul>\n' +
+                '    ' + projectsHtml + '\n' +
+                '  </div>\n' +
+                '</article>\n';
+        });
+
+        _els.spineNodes.innerHTML = html;
+
+        // Renderizar subtemas para cada fase
+        phases.forEach(function (phase) {
+            var phaseTopics = topics.filter(function (t) { return t.phase_id === phase.id; });
+            phaseTopics.sort(function (a, b) { return a.order - b.order; });
+            _renderSubtopicsForPhase(phaseTopics);
+        });
+    }
+
+    /**
+     * Renderiza la lista de topics de una fase.
+     * Cada topic tiene un header expandible y un contenedor para subtemas.
+     * @param {Array} phaseTop
