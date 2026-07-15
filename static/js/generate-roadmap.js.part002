@@ -1,0 +1,158 @@
+    for (const mapping of KEYWORD_MAP) {
+      if (mapping.keywords.some(kw => promptLower.includes(kw))) {
+        templateKey = mapping.template;
+        break;
+      }
+    }
+
+    /* Clone template */
+    let structure = JSON.parse(JSON.stringify(ROADMAP_TEMPLATES[templateKey]));
+
+    /* Personalize title with prompt */
+    if (templateKey === 'generic') {
+      const capitalized = prompt.charAt(0).toUpperCase() + prompt.slice(1);
+      structure.title = `Roadmap: ${capitalized}`;
+    }
+
+    /* Adapt complexity by level */
+    structure = adaptByLevel(structure, level);
+
+    /* Adjust number of phases by duration */
+    structure = adaptByDuration(structure, duration);
+
+    return structure;
+  }
+
+  /* ── Adapt structure complexity by level ─────────────────── */
+  function adaptByLevel(structure, level) {
+    const levelModifiers = {
+      beginner: {
+        prefix: 'Introduccion a',
+        topicTransform: (t) => simplifyTopic(t)
+      },
+      intermediate: {
+        prefix: '',
+        topicTransform: (t) => t
+      },
+      advanced: {
+        prefix: '',
+        topicTransform: (t) => t
+      }
+    };
+
+    const mod = levelModifiers[level] || levelModifiers.intermediate;
+
+    for (const phase of structure.phases) {
+      /* Transform topics based on level */
+      phase.topics = phase.topics.map(mod.topicTransform);
+
+      /* For beginner, prepend "Introduccion a" to phase names if generic */
+      if (level === 'beginner' && mod.prefix) {
+        /* Keep original phase names for non-generic templates */
+      }
+    }
+
+    /* Add level indicator to title */
+    const levelLabel = level === 'beginner' ? '(Principiante)' :
+                       level === 'intermediate' ? '(Intermedio)' : '(Avanzado)';
+    structure.title += ` ${levelLabel}`;
+
+    return structure;
+  }
+
+  /* ── Simplify topic for beginner level ───────────────────── */
+  function simplifyTopic(topic) {
+    /* Remove parenthetical details, simplify technical terms */
+    return topic
+      .replace(/\s*\([^)]*\)\s*/g, '')
+      .replace(/avanzado/gi, 'basico')
+      .replace(/advanced/gi, 'basic')
+      .replace(/specialized/gi, 'introductory')
+      .trim() || topic;
+  }
+
+  /* ── Adjust number of phases by duration ─────────────────── */
+  function adaptByDuration(structure, duration) {
+    /* Duration → number of phases mapping */
+    const phaseCounts = {
+      3:  3,
+      6:  4,
+      12: 6,
+      24: 8,
+      36: 8
+    };
+    const targetPhases = phaseCounts[duration] || 4;
+    const current = structure.phases.length;
+
+    if (targetPhases < current) {
+      /* Reduce: merge adjacent phases */
+      const merged = [];
+      const mergeRatio = current / targetPhases;
+      for (let i = 0; i < targetPhases; i++) {
+        const start = Math.floor(i * mergeRatio);
+        const end   = Math.floor((i + 1) * mergeRatio);
+        const slice  = structure.phases.slice(start, end);
+        const name   = slice.map(p => p.name).join(' + ');
+        const topics = slice.flatMap(p => p.topics);
+        /* Deduplicate topics */
+        const unique = [...new Set(topics)];
+        merged.push({ name, topics: unique });
+      }
+      structure.phases = merged;
+    } else if (targetPhases > current) {
+      /* Expand: split large phases */
+      const expanded = [];
+      const splitRatio = targetPhases / current;
+      for (const phase of structure.phases) {
+        const nSplits = Math.max(1, Math.round(splitRatio));
+        const chunkSize = Math.ceil(phase.topics.length / nSplits);
+        for (let i = 0; i < nSplits; i++) {
+          const slice = phase.topics.slice(i * chunkSize, (i + 1) * chunkSize);
+          if (slice.length > 0) {
+            const suffix = nSplits > 1 ? ` ${String.fromCharCode(65 + i)}` : '';
+            expanded.push({
+              name: phase.name + suffix,
+              topics: slice
+            });
+          }
+        }
+      }
+      /* Trim to exact target */
+      structure.phases = expanded.slice(0, targetPhases);
+    }
+
+    return structure;
+  }
+
+  /* ── Render generation result ────────────────────────────── */
+  function renderResult(structure, level, duration) {
+    if (!$resultPanel || !$resultArea) return;
+
+    const totalTopics = structure.phases.reduce((sum, p) => sum + p.topics.length, 0);
+
+    let phasesHTML = '';
+    for (const phase of structure.phases) {
+      const topicsHTML = phase.topics.map(t =>
+        `<div class="topic"><span class="mono">&#9656;</span> ${escapeHtml(t)}</div>`
+      ).join('');
+      phasesHTML += `
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:600;margin-bottom:4px;color:var(--accent);">${escapeHtml(phase.name)}</div>
+          <div class="topic-list">
+            ${topicsHTML}
+          </div>
+        </div>
+      `;
+    }
+
+    $resultPanel.style.display = '';
+    if ($statusTag) {
+      $statusTag.style.display = '';
+      $statusTag.textContent = 'Listo';
+      $statusTag.className = 'tag tag-green';
+    }
+
+    $resultArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-head">
+          <span class="kicker">Roadmap generado</span>
