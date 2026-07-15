@@ -1,0 +1,172 @@
+/**
+ * ============================================================================
+ * subtopics.js — Nivel de subtemas (spec v2)
+ * ============================================================================
+ * Cada topic tiene subtemas accionables con checkboxes.
+ * El usuario marca subtemas; los topics y fases calculan su estado
+ * automaticamente.
+ *
+ * Namespace global: Subtopics
+ * Depende de: DB (db.js), Roadmap (roadmap.js), App (app.js)
+ * ============================================================================
+ */
+
+var Subtopics = (function () {
+    'use strict';
+
+    /* ──────────────────────── inyectar CSS ──────────────────────── */
+
+    (function _injectStyles() {
+        if (document.getElementById('subtopic-styles')) return;
+        var style = document.createElement('style');
+        style.id = 'subtopic-styles';
+        style.textContent =
+            '.subtopic-list { margin: 8px 0 8px 24px; display: none; flex-direction: column; gap: 6px; }\n' +
+            '.subtopic-list.is-expanded { display: flex; }\n' +
+            '.subtopic-item { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: background .15s; }\n' +
+            '.subtopic-item:hover { background: var(--card); }\n' +
+            '.subtopic-item input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }\n' +
+            '.subtopic-title { font-size: 13px; color: var(--text-secondary); transition: all .2s; }\n' +
+            '.subtopic-title.done { text-decoration: line-through; opacity: .5; color: var(--muted); }\n' +
+            '.topic-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; padding: 4px 0; }\n' +
+            '.topic-header:hover { opacity: 0.8; }\n' +
+            '.topic-chevron { font-size: 11px; color: var(--muted); transition: transform .2s; display: inline-block; }\n' +
+            '.topic-chevron.is-expanded { transform: rotate(180deg); }\n';
+        document.head.appendChild(style);
+    })();
+
+    /* ──────────────────────── utilidades ──────────────────────── */
+
+    function _esc(text) {
+        if (typeof text !== 'string') return String(text || '');
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /* ──────────────────────── API pública ──────────────────────── */
+
+    /**
+     * Toggle el estado done de un subtema.
+     * Recalcula el estado del topic padre y de la fase en cascada.
+     * @param {number} subtopicId — ID del subtema
+     */
+    function toggle(subtopicId) {
+        var st = DB.getById('subtopics', subtopicId);
+        if (!st) {
+            console.warn('[Subtopics] toggle: subtema no encontrado:', subtopicId);
+            return;
+        }
+
+        st.done = !st.done;
+        st.done_at = st.done ? new Date().toISOString() : null;
+        DB.update('subtopics', subtopicId, st);
+
+        // Recalcular status del topic padre
+        var topic = DB.getById('topics', st.topic_id);
+        if (!topic) return;
+
+        var siblings = DB.query('subtopics', function (s) { return s.topic_id === st.topic_id; });
+        var allDone = siblings.every(function (s) { return s.done; });
+        var someDone = siblings.some(function (s) { return s.done; });
+
+        var newStatus = 'todo';
+        if (allDone) newStatus = 'done';
+        else if (someDone) newStatus = 'current';
+
+        if (topic.status !== newStatus) {
+            var topicChanges = { status: newStatus };
+            if (newStatus === 'done' && !topic.completed_at) {
+                topicChanges.completed_at = new Date().toISOString();
+            } else if (newStatus !== 'done') {
+                topicChanges.completed_at = null;
+            }
+            DB.update('topics', topic.id, topicChanges);
+
+            // Recalcular estado de la fase
+            _recalcPhaseStatus(topic.phase_id);
+        }
+
+        // Refrescar UI
+        Roadmap.render();
+        if (typeof App !== 'undefined' && typeof App.updateProgress === 'function') {
+            App.updateProgress();
+        }
+    }
+
+    /**
+     * Recalcula el estado de una fase basado en sus topics.
+     * @param {number} phaseId — ID de la fase
+     * @private
+     */
+    function _recalcPhaseStatus(phaseId) {
+        var phaseTopics = DB.query('topics', function (t) { return t.phase_id === phaseId; });
+        var phaseAllDone = phaseTopics.every(function (t) { return t.status === 'done'; });
+        var phaseSomeDone = phaseTopics.some(function (t) {
+            return t.status === 'done' || t.status === 'current';
+        });
+
+        var phaseStatus = '';
+        if (phaseAllDone) phaseStatus = 'done';
+        else if (phaseSomeDone) phaseStatus = 'current';
+
+        DB.update('phases', phaseId, { status: phaseStatus });
+    }
+
+    /**
+     * Renderiza los subtemas de un topic dentro de un contenedor.
+     * @param {number} topicId — ID del topic
+     * @param {HTMLElement} container — elemento donde se renderizan los subtemas
+     */
+    function renderForTopic(topicId, container) {
+        var subtopics = DB.query('subtopics', function (s) {
+            return s.topic_id === topicId;
+        }).sort(function (a, b) { return a.order - b.order; });
+
+        if (!subtopics.length) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var html = '<div class="subtopic-list" data-subtopic-container="' + topicId + '">';
+        subtopics.forEach(function (st) {
+            html +=
+                '<label class="subtopic-item" data-id="' + st.id + '">' +
+                '<input type="checkbox" ' + (st.done ? 'checked' : '') + ' data-subtopic-id="' + st.id + '">' +
+                '<span class="subtopic-title' + (st.done ? ' done' : '') + '">' + _esc(st.title) + '</span>' +
+                '</label>';
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+
+        // Bind events a los checkboxes
+        var checkboxes = container.querySelectorAll('input[type="checkbox"]');
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].addEventListener('change', function (e) {
+                toggle(parseInt(e.target.dataset.subtopicId, 10));
+            });
+        }
+    }
+
+    /**
+     * Retorna el número de subtemas completados para un topic.
+     * @param {number} topicId — ID del topic
+     * @returns {Object} { done, total }
+     */
+    function getProgress(topicId) {
+        var subtopics = DB.query('subtopics', function (s) { return s.topic_id === topicId; });
+        if (!subtopics.length) return { done: 0, total: 0 };
+        var done = subtopics.filter(function (s) { return s.done; }).length;
+        return { done: done, total: subtopics.length };
+    }
+
+    /* ──────────────────────── API pública ──────────────────────── */
+
+    return {
+        toggle: toggle,
+        renderForTopic: renderForTopic,
+        getProgress: getProgress
+    };
+
+})();
