@@ -1,0 +1,252 @@
+/* ═══════════════════════════════════════════
+   Tutorials — AI Learning OS Extension
+   Grid de tutoriales y recursos educativos
+   ═══════════════════════════════════════════ */
+
+const Tutorials = (() => {
+  'use strict';
+
+  /* ── Seed data ── */
+  const TUTORIALS_DATA = [
+    {
+      id: 1,
+      title: 'Kubernetes Tutorial for Beginners',
+      author: 'TechWorld with Nana',
+      description: 'Curso completo de Kubernetes desde cero: pods, services, deployments y mas.',
+      type: 'video',
+      url: 'https://www.youtube.com/playlist?list=PLy7NrYWoggjwPggqtAcU1k3L_sO2kXh93',
+      platform: 'youtube',
+      tags: ['kubernetes', 'devops', 'containers'],
+      free: true
+    },
+    {
+      id: 2,
+      title: 'AWS Certified Solutions Architect',
+      author: 'freeCodeCamp',
+      description: 'Preparacion completa para la certificacion SAA-C03 de AWS.',
+      type: 'course',
+      url: 'https://www.youtube.com/watch?v=Ia-UEYYR44s',
+      platform: 'youtube',
+      tags: ['aws', 'cloud', 'certification'],
+      free: true
+    },
+    {
+      id: 3,
+      title: 'Docker Complete Course',
+      author: 'Amigoscode',
+      description: 'Docker desde lo basico hasta orquestacion con Docker Compose.',
+      type: 'course',
+      url: 'https://www.youtube.com/watch?v=pGyCOYcKPVM',
+      platform: 'youtube',
+      tags: ['docker', 'containers', 'devops'],
+      free: true
+    },
+    {
+      id: 4,
+      title: 'Linux for Hackers',
+      author: 'NetworkChuck',
+      description: 'Serie de videos para dominar Linux desde la perspectiva de ciberseguridad.',
+      type: 'playlist',
+      url: 'https://www.youtube.com/playlist?list=PLIhvC56v63IKq6OJK2MW3gWGEBPj5nJtu',
+      platform: 'youtube',
+      tags: ['linux', 'security', 'hacking'],
+      free: true
+    },
+    {
+      id: 5,
+      title: 'Cloud Security Fundamentals',
+      author: 'SANS Institute',
+      description: 'Principios fundamentales de seguridad en la nube.',
+      type: 'video',
+      url: 'https://www.youtube.com/@SANSInstitute',
+      platform: 'youtube',
+      tags: ['cloud', 'security', 'fundamentals'],
+      free: true
+    },
+    {
+      id: 6,
+      title: 'DefCon Conference 2024',
+      author: 'DEF CON',
+      description: 'Charlas y talleres de la conferencia de hacking mas grande del mundo.',
+      type: 'conference',
+      url: 'https://www.youtube.com/@DEFCONConference',
+      platform: 'youtube',
+      tags: ['hacking', 'conference', 'security'],
+      free: true
+    },
+    {
+      id: 7,
+      title: 'Terraform Tutorial',
+      author: 'HashiCorp',
+      description: 'Infraestructura como codigo con Terraform: providers, resources, state.',
+      type: 'official',
+      url: 'https://developer.hashicorp.com/terraform/tutorials',
+      platform: 'web',
+      tags: ['terraform', 'iac', 'devops'],
+      free: true
+    },
+    {
+      id: 8,
+      title: 'Introduction to Cyber Security',
+      author: 'Open University',
+      description: 'Curso introductorio gratuito sobre ciberseguridad.',
+      type: 'course',
+      url: 'https://www.open.edu/openlearn/science-maths-technology/computing-ict/introduction-cyber-security/content-section-0',
+      platform: 'web',
+      tags: ['security', 'fundamentals', 'beginner'],
+      free: true
+    },
+    {
+      id: 9,
+      title: 'Wireshark Tutorial',
+      author: 'Chris Greer',
+      description: 'Analisis de trafico de red con Wireshark desde cero.',
+      type: 'video',
+      url: 'https://www.youtube.com/@ChrisGreer',
+      platform: 'youtube',
+      tags: ['wireshark', 'networking', 'analysis'],
+      free: true
+    },
+    {
+      id: 10,
+      title: 'HackTheBox Starting Point',
+      author: 'IppSec',
+      description: 'Walkthroughs detallados de maquinas Starting Point de HackTheBox.',
+      type: 'playlist',
+      url: 'https://www.youtube.com/@ippsec',
+      platform: 'youtube',
+      tags: ['hackthebox', 'pentesting', 'walkthrough'],
+      free: true
+    },
+    {
+      id: 11,
+      title: 'Active Directory Explained',
+      author: 'John Hammond',
+      description: 'Conceptos y tecnicas de explotacion de Active Directory.',
+      type: 'video',
+      url: 'https://www.youtube.com/@_JohnHammond',
+      platform: 'youtube',
+      tags: ['active-directory', 'windows', 'security'],
+      free: true
+    },
+    {
+      id: 12,
+      title: 'CISSP Exam Preparation',
+      author: 'Pete Zerger',
+      description: 'Serie de preparacion para el examen CISSP con explicaciones claras.',
+      type: 'course',
+      url: 'https://www.youtube.com/@PeteZerger',
+      platform: 'youtube',
+      tags: ['cissp', 'certification', 'security'],
+      free: true
+    }
+  ];
+
+  /* ── Type meta ── */
+  const TYPE_META = {
+    video:      { label: 'Video',       icon: 'youtube',     color: 'red'    },
+    course:     { label: 'Curso',       icon: 'recursos',    color: 'blue'   },
+    playlist:   { label: 'Playlist',    icon: 'youtube',     color: 'red'    },
+    conference: { label: 'Conferencia', icon: 'info',        color: 'purple' },
+    official:   { label: 'Oficial',     icon: 'github',      color: 'green'  }
+  };
+
+  /* ── State ── */
+  const state = {
+    items:      [...TUTORIALS_DATA],
+    filterText: '',
+    type:       'all'
+  };
+
+  /* ── DOM cache ── */
+  let $search = null;
+  let $chips  = null;
+  let $grid   = null;
+  let $view   = null;
+
+  /* ═══════════════════════════════════════════
+     Helpers
+     ═══════════════════════════════════════════ */
+
+  function getTypeLabel(type) {
+    return TYPE_META[type]?.label || type;
+  }
+
+  function getTypeIcon(type) {
+    return TYPE_META[type]?.icon || 'recursos';
+  }
+
+  function getTypeColor(type) {
+    return TYPE_META[type]?.color || 'gray';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /* ═══════════════════════════════════════════
+     Filtering
+     ═══════════════════════════════════════════ */
+
+  function filterData() {
+    const text = state.filterText.toLowerCase().trim();
+    const t    = state.type;
+
+    return state.items.filter(item => {
+      const matchesText = !text ||
+        item.title.toLowerCase().includes(text) ||
+        item.author.toLowerCase().includes(text) ||
+        item.description.toLowerCase().includes(text) ||
+        item.tags.some(tag => tag.toLowerCase().includes(text));
+
+      const matchesType = t === 'all' || item.type === t;
+
+      return matchesText && matchesType;
+    });
+  }
+
+  /* ═══════════════════════════════════════════
+     Rendering
+     ═══════════════════════════════════════════ */
+
+  function renderEmpty() {
+    return `
+      <div class="empty">
+        <div class="empty-ico">
+          <svg class="ico"><use href="#i-busqueda"></use></svg>
+        </div>
+        <p class="empty-hint">No se encontraron tutoriales con los filtros activos.</p>
+        <button class="btn btn-sm btn-ghost" id="tutorials-clear-filters">Limpiar filtros</button>
+      </div>
+    `;
+  }
+
+  function renderGrid(items) {
+    if (!$grid) return;
+
+    if (!items || items.length === 0) {
+      $grid.innerHTML = renderEmpty();
+      bindClearFilters();
+      return;
+    }
+
+    const html = items.map(item => {
+      const typeLabel = escapeHtml(getTypeLabel(item.type));
+      const typeIcon  = getTypeIcon(item.type);
+      const typeColor = getTypeColor(item.type);
+      const platIcon  = item.platform === 'youtube' ? 'youtube' : 'externo';
+
+      const tagsHtml = item.tags.slice(0, 3).map(tag =>
+        `<span class="tag tag-blue" style="font-size:10px;">${escapeHtml(tag)}</span>`
+      ).join('');
+
+      return `
+        <div class="res-card" data-id="${item.id}" data-type="${escapeHtml(item.type)}">
+          <div class="res-top">
+            <div class="res-logo" style="background:var(--${typeColor})">
+              <svg class="ico" style="width:16px;height:16px;color:#fff;"><use href="#i-${typeIcon}"></use></svg>
+            </div>
+            <div c
