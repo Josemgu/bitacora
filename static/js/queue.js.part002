@@ -1,0 +1,234 @@
+              </div>
+              ${description ? `<p class="queue-desc">${description}</p>` : ''}
+              ${reason ? `<div class="queue-reason"><strong>Razón IA:</strong> ${reason}</div>` : ''}
+              <div class="queue-url-row">
+                <a href="${url}" target="_blank" rel="noopener noreferrer" class="queue-url">${url}</a>
+              </div>
+            </div>
+          </div>
+          <div class="queue-actions">
+            <button class="btn btn-primary btn-sm" data-action="approve" data-id="${item.id}">Aprobar</button>
+            <button class="btn btn-ghost btn-sm" data-action="edit-approve" data-id="${item.id}">Editar y aprobar</button>
+            <button class="btn btn-ghost btn-sm" data-action="reject" data-id="${item.id}">Rechazar</button>
+          </div>
+        </article>
+      `;
+    }).join('');
+  };
+
+  /* ---------- Barra de acciones en lote ---------- */
+  const renderBulkBar = () => {
+    if (!$bulkBar) return;
+    const count = state.selectedIds.size;
+    if (count === 0) {
+      $bulkBar.classList.add('hidden');
+      return;
+    }
+    $bulkBar.classList.remove('hidden');
+    $bulkBar.innerHTML = `
+      <span class="bulk-count">${count} seleccionado${count > 1 ? 's' : ''}</span>
+      <div class="bulk-buttons">
+        <button class="btn btn-primary btn-sm" data-action="bulk-approve">Aprobar ${count}</button>
+        <button class="btn btn-ghost btn-sm" data-action="bulk-reject">Rechazar ${count}</button>
+        <button class="btn btn-ghost btn-sm" data-action="bulk-clear">Cancelar</button>
+      </div>
+    `;
+  };
+
+  /* ==================== ACCIONES ==================== */
+
+  /* ---------- Aprobar ---------- */
+  const approve = (id, overrides = {}) => {
+    const queue = DB.data.resource_queue || [];
+    const item = queue.find(q => q.id === id);
+    if (!item) return;
+
+    const resource = {
+      title: overrides.title != null ? overrides.title : (item.title || ''),
+      url: overrides.url != null ? overrides.url : (item.url || ''),
+      description: overrides.description != null ? overrides.description : (item.description || ''),
+      category: overrides.category != null ? overrides.category : (item.category || item.category_suggested || 'blog'),
+      phase: overrides.phase != null ? overrides.phase : (item.phase != null ? item.phase : item.phase_suggested),
+      origin: 'ai',
+      status: 'active',
+      link_status: 'unknown',
+      ai_metadata: {
+        confidence: item.confidence,
+        model: item.model,
+        reason: item.reason
+      },
+      created_at: nowISO(),
+      updated_at: nowISO()
+    };
+
+    const inserted = DB.insert('resources', resource);
+    if (!inserted) {
+      alert('Error al crear el recurso.');
+      return;
+    }
+
+    DB.update('resource_queue', id, {
+      status: 'approved',
+      reviewed_at: nowISO(),
+      resource_id: inserted.id
+    });
+
+    state.selectedIds.delete(id);
+    render();
+  };
+
+  /* ---------- Rechazar ---------- */
+  const reject = (id) => {
+    const updated = DB.update('resource_queue', id, {
+      status: 'rejected',
+      reviewed_at: nowISO()
+    });
+    if (updated) {
+      state.selectedIds.delete(id);
+      render();
+    }
+  };
+
+  /* ---------- Acción en lote ---------- */
+  const bulkAction = (ids, action) => {
+    if (!ids || ids.length === 0) return;
+    if (!confirm(`¿${action === 'approve' ? 'Aprobar' : 'Rechazar'} ${ids.length} recurso(s)?`)) return;
+
+    ids.forEach(id => {
+      if (action === 'approve') {
+        approve(id);
+      } else {
+        reject(id);
+      }
+    });
+    state.selectedIds.clear();
+    render();
+  };
+
+  /* ---------- Modal: Editar y aprobar ---------- */
+  const showEditModal = (itemId) => {
+    const queue = DB.data.resource_queue || [];
+    const item = queue.find(q => q.id === itemId);
+    if (!item) return;
+
+    const modalId = 'modal-edit-queue';
+    let $modal = document.getElementById(modalId);
+
+    if ($modal) {
+      $modal.remove();
+    }
+
+    $modal = document.createElement('div');
+    $modal.id = modalId;
+    $modal.className = 'modal-overlay';
+    $modal.innerHTML = `
+      <div class="modal modal-lg">
+        <header class="modal-header">
+          <h3>Editar y aprobar recurso</h3>
+          <button class="btn btn-ghost btn-sm modal-close" aria-label="Cerrar">&times;</button>
+        </header>
+        <form class="modal-body form-resource" id="form-edit-queue">
+          <input type="hidden" name="queue_id" value="${item.id}">
+          <div class="form-group">
+            <label for="eq-url">URL *</label>
+            <input type="url" id="eq-url" name="url" required value="${esc(item.url || '')}" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label for="eq-title">Título</label>
+            <input type="text" id="eq-title" name="title" value="${esc(item.title || '')}" placeholder="Título del recurso">
+          </div>
+          <div class="form-group">
+            <label for="eq-desc">Descripción</label>
+            <textarea id="eq-desc" name="description" rows="2" placeholder="Breve descripción...">${esc(item.description || '')}</textarea>
+          </div>
+          ${item.reason ? `<div class="form-group form-info"><strong>Razón IA:</strong> ${esc(item.reason)}</div>` : ''}
+          <div class="form-row">
+            <div class="form-group">
+              <label for="eq-category">Categoría</label>
+              <select id="eq-category" name="category">
+                ${CATEGORIES.map(c => {
+                  const selected = (item.category || item.category_suggested) === c ? ' selected' : '';
+                  return `<option value="${c}"${selected}>${getCategoryLabel(c)}</option>`;
+                }).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="eq-phase">Fase</label>
+              <select id="eq-phase" name="phase">
+                <option value="">—</option>
+                ${PHASES.map(p => {
+                  const itemPhase = item.phase != null ? String(item.phase) : String(item.phase_suggested || '');
+                  const selected = itemPhase === p ? ' selected' : '';
+                  return `<option value="${p}"${selected}>F${p}</option>`;
+                }).join('')}
+              </select>
+            </div>
+          </div>
+        </form>
+        <footer class="modal-footer">
+          <button type="button" class="btn btn-ghost modal-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" form="form-edit-queue">Guardar y aprobar</button>
+        </footer>
+      </div>
+    `;
+
+    document.body.appendChild($modal);
+
+    /* Eventos del modal */
+    const closeModal = () => $modal.classList.add('hidden');
+
+    $modal.querySelector('.modal-close').addEventListener('click', closeModal);
+    $modal.querySelector('.modal-cancel').addEventListener('click', closeModal);
+    $modal.addEventListener('click', (e) => {
+      if (e.target === $modal) closeModal();
+    });
+
+    /* Submit: guardar y aprobar */
+    const $form = $modal.querySelector('#form-edit-queue');
+    $form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const fd = new FormData($form);
+      const urlVal = fd.get('url')?.trim();
+      if (!urlVal) return;
+
+      let validUrl;
+      try {
+        validUrl = new URL(urlVal).href;
+      } catch {
+        alert('La URL no es válida');
+        return;
+      }
+
+      const phaseVal = fd.get('phase');
+      const overrides = {
+        title: fd.get('title')?.trim() || validUrl,
+        url: validUrl,
+        description: fd.get('description')?.trim() || '',
+        category: fd.get('category') || 'blog',
+        phase: phaseVal != null && phaseVal !== '' ? parseInt(phaseVal, 10) : null
+      };
+
+      closeModal();
+      approve(itemId, overrides);
+    });
+
+    /* Enfocar título */
+    setTimeout(() => {
+      const $titleInput = $modal.querySelector('#eq-title');
+      if ($titleInput) $titleInput.focus();
+    }, 50);
+  };
+
+  /* ==================== API Pública ==================== */
+  return {
+    init,
+    render,
+    renderBadge,
+    renderList,
+    approve,
+    reject,
+    bulkAction,
+    showEditModal
+  };
+})();
