@@ -1,0 +1,240 @@
+      '</div>'
+    ].join('');
+
+    // Bind click en cada item del sidebar
+    $sidebar.querySelectorAll('.topic[data-note-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        openNote(item.dataset.noteId);
+      });
+    });
+  }
+
+  /* ================================================================
+     RENDER: INDICADOR DE GUARDADO
+   ================================================================ */
+  function showSaveIndicator(text, isSuccess) {
+    if (!$saveIndicator) return;
+    $saveIndicator.textContent = text;
+    $saveIndicator.style.color = isSuccess ? 'var(--success,#10b981)' : 'var(--text-3,#9ca3af)';
+    $saveIndicator.style.opacity = '1';
+
+    // Fade out despues de 2 segundos
+    setTimeout(() => {
+      if ($saveIndicator) {
+        $saveIndicator.style.transition = 'opacity 0.8s ease';
+        $saveIndicator.style.opacity = '0.3';
+      }
+    }, 2000);
+  }
+
+  /* ================================================================
+     CRUD: ABRIR NOTA
+   ================================================================ */
+  function openNote(id) {
+    const note = state.notes.find(n => n.id === id);
+    if (!note) return;
+
+    state.activeId = id;
+
+    // Mostrar editor, ocultar empty
+    if ($editorPanel) $editorPanel.style.display = '';
+    if ($emptyPanel) $emptyPanel.style.display = 'none';
+
+    // Rellenar inputs
+    if ($titleInput) $titleInput.value = note.title || '';
+    if ($contentInput) $contentInput.value = note.content || '';
+
+    // Guardar snapshot para deteccion de cambios
+    state.lastSaved[id] = {
+      title: note.title || '',
+      content: note.content || ''
+    };
+    state.isDirty = false;
+
+    // Actualizar sidebar para resaltar activa
+    renderSidebar();
+
+    // Enfocar titulo
+    if ($titleInput) setTimeout(() => $titleInput.focus(), 50);
+  }
+
+  /* ================================================================
+     CRUD: CREAR NOTA
+   ================================================================ */
+  function createNote() {
+    const newNote = {
+      id: generateId(),
+      title: '',
+      content: '',
+      tags: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      DB.insert('notes', newNote);
+    } catch (err) {
+      console.warn('[Notes] DB.insert failed, keeping in memory:', err);
+    }
+
+    state.notes.unshift(newNote);
+    state.activeId = newNote.id;
+
+    // Guardar snapshot vacio
+    state.lastSaved[newNote.id] = { title: '', content: '' };
+    state.isDirty = false;
+
+    // Mostrar editor, ocultar empty
+    if ($editorPanel) $editorPanel.style.display = '';
+    if ($emptyPanel) $emptyPanel.style.display = 'none';
+
+    // Limpiar inputs
+    if ($titleInput) $titleInput.value = '';
+    if ($contentInput) $contentInput.value = '';
+
+    renderSidebar();
+
+    // Enfocar titulo
+    if ($titleInput) setTimeout(() => $titleInput.focus(), 50);
+  }
+
+  /* ================================================================
+     CRUD: GUARDAR NOTA
+   ================================================================ */
+  function saveNote() {
+    if (!state.activeId) return;
+
+    const title = $titleInput ? ($titleInput.value || '').trim() : '';
+    const content = $contentInput ? ($contentInput.value || '') : '';
+
+    // Generar titulo automaticamente si esta vacio
+    const finalTitle = title || (content ? content.split('\n')[0].substring(0, 50) : 'Sin titulo');
+
+    const changes = {
+      title: finalTitle,
+      content: content,
+      updated_at: new Date().toISOString()
+    };
+
+    // Detectar tags del contenido (#tag)
+    const tagMatches = content.match(/#(\w+)/g);
+    if (tagMatches) {
+      changes.tags = tagMatches.map(t => t.slice(1).toLowerCase());
+    }
+
+    try {
+      const existing = state.notes.find(n => n.id === state.activeId);
+      if (existing) {
+        DB.update('notes', state.activeId, changes);
+        // Actualizar en memoria tambien
+        Object.assign(existing, changes);
+      }
+    } catch (err) {
+      console.warn('[Notes] DB.update failed:', err);
+      // Actualizar en memoria de todas formas
+      const existing = state.notes.find(n => n.id === state.activeId);
+      if (existing) Object.assign(existing, changes);
+    }
+
+    // Actualizar snapshot
+    state.lastSaved[state.activeId] = {
+      title: finalTitle,
+      content: content
+    };
+    state.isDirty = false;
+
+    // Mostrar indicador y refrescar sidebar
+    showSaveIndicator('Guardado', true);
+    renderSidebar();
+  }
+
+  /* ================================================================
+     CRUD: ELIMINAR NOTA
+   ================================================================ */
+  function deleteNote(id) {
+    const note = state.notes.find(n => n.id === (id || state.activeId));
+    const title = note ? (note.title || 'esta nota') : 'esta nota';
+
+    if (!confirm('Eliminar "' + title + '"? Esta accion no se puede deshacer.')) {
+      return;
+    }
+
+    const targetId = id || state.activeId;
+    if (!targetId) return;
+
+    try {
+      DB.delete('notes', targetId);
+    } catch (err) {
+      console.warn('[Notes] DB.delete failed:', err);
+    }
+
+    // Remover de estado
+    state.notes = state.notes.filter(n => n.id !== targetId);
+
+    // Limpiar active si era la nota eliminada
+    if (state.activeId === targetId) {
+      state.activeId = null;
+      state.isDirty = false;
+      if ($editorPanel) $editorPanel.style.display = 'none';
+      if ($emptyPanel) $emptyPanel.style.display = '';
+      if ($titleInput) $titleInput.value = '';
+      if ($contentInput) $contentInput.value = '';
+    }
+
+    renderSidebar();
+  }
+
+  /* ================================================================
+     AUTO-GUARDADO
+   ================================================================ */
+  function hasUnsavedChanges() {
+    if (!state.activeId) return false;
+
+    const saved = state.lastSaved[state.activeId];
+    if (!saved) return true;
+
+    const currentTitle = ($titleInput ? $titleInput.value : '') || '';
+    const currentContent = ($contentInput ? $contentInput.value : '') || '';
+
+    return saved.title !== currentTitle || saved.content !== currentContent;
+  }
+
+  function autoSave() {
+    if (!state.activeId) return;
+    if (!hasUnsavedChanges()) return;
+
+    saveNote();
+  }
+
+  function startAutoSaveTimer() {
+    if (state.autoSaveTimer) {
+      clearInterval(state.autoSaveTimer);
+    }
+    state.autoSaveTimer = setInterval(() => {
+      try {
+        autoSave();
+      } catch (err) {
+        console.error('[Notes] autoSave error:', err);
+      }
+    }, AUTOSAVE_INTERVAL_MS);
+  }
+
+  function stopAutoSaveTimer() {
+    if (state.autoSaveTimer) {
+      clearInterval(state.autoSaveTimer);
+      state.autoSaveTimer = null;
+    }
+  }
+
+  /* ================================================================
+     BIND EVENTOS
+   ================================================================ */
+  function bindEvents() {
+    // Boton nueva nota
+    if ($btnNew) {
+      $btnNew.addEventListener('click', () => {
+        // Si hay cambios sin guardar, guardar primero
+        if (hasUnsavedChanges()) {
+          saveNote();
+        }
+        createNote();
