@@ -1,0 +1,203 @@
+',
+          '<button class="btn btn-primary" onclick="Messages.approveMessage(\'' + msg.id + '\')">',
+            svgIcon('check', 14), ' Aprobar',
+          '</button>',
+          '<button class="btn btn-ghost" onclick="Messages.rejectMessage(\'' + msg.id + '\')" style="color:var(--red);border-color:rgba(248,81,73,0.3)">',
+            svgIcon('x', 14), ' Rechazar',
+          '</button>',
+          '<button class="btn btn-ghost" onclick="Messages.suggestAlternative(\'' + msg.id + '\')">',
+            svgIcon('ia', 14), ' Sugerir otra cosa',
+          '</button>',
+        '</div>'
+      ].join('');
+    } else {
+      const markReadBtn = msg.status === 'unread' ?
+        '<button class="btn btn-primary" onclick="Messages.markRead(\'' + msg.id + '\')">' + svgIcon('check', 14) + ' Marcar como leido</button>' :
+        '<button class="btn btn-ghost" disabled>Leido</button>';
+      actionButtons = [
+        '<div class="mail-actions">',
+          markReadBtn,
+        '</div>'
+      ].join('');
+    }
+
+    return [
+      '<div class="mail-detail">',
+        '<button class="mail-back-btn" onclick="Messages.backToList()">',
+          svgIcon('flecha_izq', 14), ' Volver a la bandeja',
+        '</button>',
+        '<div class="mail-detail-header">',
+          '<div class="mail-detail-sender">',
+            '<span class="mail-detail-sender-icon">' + SENDER_ICON_SVG + '</span>',
+            '<span>' + SENDER_NAME + '</span>',
+            '<span class="mail-kind-tag" style="' + tagStyle + '">' + kindInfo.label + '</span>',
+          '</div>',
+          '<div class="mail-detail-subject">' + escapeHtml(msg.subject) + '</div>',
+          '<div class="mail-detail-date">' + dateStr + '</div>',
+        '</div>',
+        '<div class="mail-detail-body">' + escapeHtml(msg.body).replace(/\n/g, '<br>') + '</div>',
+        actionButtons,
+      '</div>'
+    ].join('');
+  }
+
+  /* ================================================================
+     RENDER: CHIPS DE CATEGORIA
+     ================================================================ */
+  function renderChips() {
+    if (!$chips) return;
+
+    const categories = [
+      { key: 'all', label: 'Todos' }
+    ];
+    Object.keys(CATEGORY_MAP).forEach(key => {
+      categories.push({ key, label: CATEGORY_MAP[key].label });
+    });
+
+    $chips.innerHTML = categories.map(cat => {
+      const isActive = state.category === cat.key;
+      return '<button class="chip chip-sm ' + (isActive ? 'is-on' : '') + '" data-cat="' + cat.key + '">' + escapeHtml(cat.label) + '</button>';
+    }).join('');
+
+    // Bind clicks
+    $chips.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.category = btn.dataset.cat;
+        state.viewMode = 'list';
+        state.currentDetailId = null;
+        renderChips();
+        renderMailbox();
+      });
+    });
+  }
+
+  /* ================================================================
+     RENDER: VISTA COMPLETA DEL MAILBOX
+     ================================================================ */
+  function renderMailbox() {
+    if (!$list) return;
+
+    // Chips siempre renderizados
+    renderChips();
+
+    let html = '';
+
+    if (state.viewMode === 'detail' && state.currentDetailId) {
+      // Vista detalle: no mostrar summary ni bulk
+      html = renderMessageDetail(state.currentDetailId);
+    } else {
+      // Vista lista: summary + bulk bar + lista
+      html = [
+        renderSummaryCard(),
+        renderBulkBar(),
+        renderMessageList()
+      ].join('');
+    }
+
+    $list.innerHTML = html;
+    updateBadge();
+  }
+
+  /* ================================================================
+     RENDER: wrapper legacy (compatibilidad)
+     ================================================================ */
+  function render() {
+    renderMailbox();
+  }
+
+  /* ================================================================
+     ACCIONES: NAVEGACION
+     ================================================================ */
+  function openMessage(msgId) {
+    // Al abrir, marcar como leido automaticamente
+    const idx = state.messages.findIndex(m => m.id === msgId);
+    if (idx !== -1 && state.messages[idx].status === 'unread') {
+      state.messages[idx].status = 'read';
+      try { DB.update('messages', msgId, { status: 'read' }); } catch (e) { /* noop */ }
+      updateBadge();
+    }
+
+    state.viewMode = 'detail';
+    state.currentDetailId = msgId;
+    renderMailbox();
+  }
+
+  function backToList() {
+    state.viewMode = 'list';
+    state.currentDetailId = null;
+    renderMailbox();
+  }
+
+  /* ================================================================
+     ACCIONES: SELECCION EN LOTE
+     ================================================================ */
+  function toggleSelection(msgId) {
+    if (state.selection.has(msgId)) {
+      state.selection.delete(msgId);
+    } else {
+      state.selection.add(msgId);
+    }
+    updateBulkBar();
+  }
+
+  function clearSelection() {
+    state.selection.clear();
+    updateBulkBar();
+    renderMailbox();
+  }
+
+  function updateBulkBar() {
+    const $bar = qs('#mail-bulk-bar');
+    if (!$bar) return;
+    const count = state.selection.size;
+    if (count > 0) {
+      $bar.classList.add('active');
+    } else {
+      $bar.classList.remove('active');
+    }
+    const $count = $bar.querySelector('.mail-bulk-count');
+    if ($count) {
+      $count.innerHTML = '<strong>' + count + '</strong> seleccionados';
+    }
+  }
+
+  /* ================================================================
+     ACCIONES: APROBAR / RECHAZAR (individual)
+     ================================================================ */
+  function approveMessage(msgId) {
+    try {
+      const idx = state.messages.findIndex(m => m.id === msgId);
+      if (idx === -1) return;
+      state.messages[idx].status = 'approved';
+      try { DB.update('messages', msgId, { status: 'approved' }); } catch (e) { /* noop */ }
+      // Simular accion: volver a lista tras breve delay
+      backToList();
+    } catch (err) {
+      console.error('[Messages] approveMessage error:', err);
+    }
+  }
+
+  function rejectMessage(msgId) {
+    try {
+      const idx = state.messages.findIndex(m => m.id === msgId);
+      if (idx === -1) return;
+      state.messages[idx].status = 'rejected';
+      try { DB.update('messages', msgId, { status: 'rejected' }); } catch (e) { /* noop */ }
+      backToList();
+    } catch (err) {
+      console.error('[Messages] rejectMessage error:', err);
+    }
+  }
+
+  function suggestAlternative(msgId) {
+    // Abre el chat con contexto del mensaje
+    const msg = state.messages.find(m => m.id === msgId);
+    if (!msg) return;
+
+    // Navegar a la vista de chat
+    window.location.hash = 'chat';
+
+    // Si existe Chat global, intentar enviar contexto
+    setTimeout(() => {
+      try {
+        if (typeof Chat !== 'undefined' && Chat.sendMessage) {
