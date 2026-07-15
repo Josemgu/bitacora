@@ -1,0 +1,208 @@
+/**
+ * ============================================================================
+ * link-checker.js — F4: Verificador de enlaces
+ * ============================================================================
+ * Comprueba el estado HTTP de los recursos almacenados, detecta links rotos,
+ * redirecciones y actualiza la base de datos con los resultados.
+ *
+ * Caracteristicas:
+ *   - SSRF protection (bloquea rangos privados, solo http/https)
+ *   - Manejo de CORS desde navegador (mode: no-cors + proxy opcional)
+ *   - Concurrencia maxima 5, rate-limit por host (200 ms)
+ *   - Cancelable via AbortController
+ *   - Clasificacion: ok | redirect | broken | unknown
+ *
+ * Namespace global: LinkChecker
+ * Dependencias: DB (js/db.js)
+ * ============================================================================
+ */
+
+const LinkChecker = (() => {
+  'use strict';
+
+  /* ──────────────────────── constantes ──────────────────────── */
+
+  const TIMEOUT_MS = 10000;
+  const MAX_CONCURRENT = 5;
+  const HOST_DELAY_MS = 200;
+  const USER_AGENT = 'Bitacora-LinkChecker/1.0';
+  const MAX_REDIRECTS = 3;
+
+  /** Rangos IP privados bloqueados (SSRF protection) */
+  const PRIVATE_IPV4 = [
+    { mask: 8,  start: 127 << 24 },           // 127.0.0.0/8
+    { mask: 8,  start: 10  << 24 },           // 10.0.0.0/8
+    { mask: 12, start: (172 << 24) | (16 << 16) },  // 172.16.0.0/12
+    { mask: 16, start: (192 << 24) | (168 << 16) }, // 192.168.0.0/16
+    { mask: 16, start: (169 << 24) | (254 << 16) }  // 169.254.0.0/16
+  ];
+
+  const STATUS_MAP = {
+    ok:       { color: 'green',  dot: 'dot-green',  label: 'OK' },
+    redirect: { color: 'yellow', dot: 'dot-yellow', label: 'Redirect' },
+    broken:   { color: 'red',    dot: 'dot-red',    label: 'Roto' },
+    unknown:  { color: 'gray',   dot: 'dot-gray',   label: 'Sin verificar' }
+  };
+
+  /* ──────────────────────── estado interno ──────────────────────── */
+
+  let _abortController = null;
+  let _isRunning = false;
+  let _hostLastRequest = {}; // hostname -> timestamp
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     INICIALIZACION
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  function init() {
+    console.log('[LinkChecker] Inicializado');
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     VERIFICACION INDIVIDUAL
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /**
+   * Verifica el estado HTTP de un recurso por su ID.
+   * @param {number} resourceId
+   * @returns {Promise<{status: string, httpCode: number|null}>}
+   */
+  async function verifyOne(resourceId) {
+    const resource = DB.getById('resources', resourceId);
+    if (!resource) {
+      console.warn('[LinkChecker] Recurso no encontrado:', resourceId);
+      return { status: 'unknown', httpCode: null };
+    }
+
+    if (!resource.url) {
+      console.warn('[LinkChecker] Recurso sin URL:', resourceId);
+      return { status: 'unknown', httpCode: null };
+    }
+
+    /* SSRF check */
+    if (!canCheckUrl(resource.url)) {
+      console.warn('[LinkChecker] URL bloqueada por SSRF protection:', resource.url);
+      return { status: 'unknown', httpCode: null };
+    }
+
+    const result = await _checkUrl(resource.url);
+
+    /* Guardar en DB */
+    DB.update('resources', resourceId, {
+      link_status: result.status,
+      link_http_code: result.httpCode,
+      link_checked_at: new Date().toISOString()
+    });
+
+    return result;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     VERIFICACION MASIVA
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /**
+   * Verifica todos los recursos activos con concurrencia controlada.
+   * Muestra progreso en vivo y resumen al finalizar.
+   * @returns {Promise<void>}
+   */
+  async function verifyAll() {
+    if (_isRunning) {
+      console.warn('[LinkChecker] Ya hay una verificacion en curso. Cancela primero.');
+      return;
+    }
+
+    const resources = DB.getAll('resources').filter(r => r.status === 'active' && r.url);
+    if (resources.length === 0) {
+      _showSummary({ ok: 0, redirect: 0, broken: 0, unknown: 0, total: 0 });
+      return;
+    }
+
+    _isRunning = true;
+    _abortController = new AbortController();
+    _hostLastRequest = {};
+
+    const stats = { ok: 0, redirect: 0, broken: 0, unknown: 0, total: resources.length };
+    let processed = 0;
+
+    _showProgress(processed, stats.total, 'Iniciando verificacion...');
+
+    try {
+      /* Procesar en lotes de MAX_CONCURRENT */
+      for (let i = 0; i < resources.length; i += MAX_CONCURRENT) {
+        if (_abortController.signal.aborted) {
+          console.log('[LinkChecker] Verificacion cancelada por el usuario.');
+          break;
+        }
+
+        const batch = resources.slice(i, i + MAX_CONCURRENT);
+        const promises = batch.map(r => _verifyOneWithProgress(r, stats, () => {
+          processed++;
+          _showProgress(processed, stats.total, `${processed}/${stats.total} verificados`);
+        }));
+
+        await Promise.all(promises);
+      }
+    } catch (err) {
+      console.error('[LinkChecker] Error en verifyAll():', err);
+    } finally {
+      _isRunning = false;
+      _abortController = null;
+      _showSummary(stats);
+    }
+  }
+
+  /**
+   * Cancela la verificacion masiva en curso.
+   */
+  function cancel() {
+    if (_abortController && !_abortController.signal.aborted) {
+      _abortController.abort();
+      console.log('[LinkChecker] Cancelacion solicitada.');
+    }
+  }
+
+  /**
+   * Verifica un recurso individual y actualiza estadisticas.
+   * @private
+   */
+  async function _verifyOneWithProgress(resource, stats, onProgress) {
+    try {
+      /* Rate limit por host */
+      const hostname = _extractHostname(resource.url);
+      await _waitForHost(hostname);
+
+      if (_abortController && _abortController.signal.aborted) return;
+
+      const result = await _checkUrl(resource.url);
+
+      /* Actualizar DB */
+      DB.update('resources', resource.id, {
+        link_status: result.status,
+        link_http_code: result.httpCode,
+        link_checked_at: new Date().toISOString()
+      });
+
+      /* Contar estadisticas */
+      if (stats[result.status] !== undefined) {
+        stats[result.status]++;
+      }
+
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+
+      /* Timeout / error de red -> unknown */
+      DB.update('resources', resource.id, {
+        link_status: 'unknown',
+        link_http_code: null,
+        link_checked_at: new Date().toISOString()
+      });
+      stats.unknown++;
+      console.warn(`[LinkChecker] Error verificando ${resource.url}:`, err.message);
+    } finally {
+      onProgress();
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     CH
