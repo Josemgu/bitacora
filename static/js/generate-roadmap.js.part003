@@ -1,0 +1,160 @@
+          <span class="tag tag-green">${structure.phases.length} fases / ${totalTopics} temas</span>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:var(--font-lg);font-weight:700;margin-bottom:4px;">${escapeHtml(structure.title)}</div>
+          <div style="font-size:var(--font-sm);color:var(--text-dim);margin-bottom:16px;">
+            <span class="mono">Nivel:</span> ${escapeHtml(level)} &nbsp;|&nbsp;
+            <span class="mono">Duracion:</span> ${duration} meses
+          </div>
+          ${phasesHTML}
+        </div>
+        <div class="panel-note" style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm btn-block" id="btn-save-generated">
+            <span class="mono">&#128190;</span> Guardar roadmap
+          </button>
+          <button class="btn btn-ghost btn-sm" id="btn-regenerate">
+            <span class="mono">&#8635;</span> Regenerar
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-save-generated').addEventListener('click', () => {
+      saveGenerated(structure);
+    });
+    document.getElementById('btn-regenerate').addEventListener('click', () => {
+      handleGenerate();
+    });
+  }
+
+  /* ── Save generated roadmap to DB ────────────────────────── */
+  function saveGenerated(structure) {
+    try {
+      const roadmapId = DB.insert('roadmaps', {
+        title: structure.title,
+        created: Date.now(),
+        updated: Date.now(),
+        source: 'generated'
+      });
+
+      let phaseOrder = 0;
+      for (const phase of structure.phases) {
+        const phaseId = DB.insert('phases', {
+          roadmap_id: roadmapId,
+          name: phase.name,
+          order: phaseOrder++,
+          created: Date.now()
+        });
+
+        let topicOrder = 0;
+        for (const topicName of phase.topics) {
+          DB.insert('topics', {
+            phase_id: phaseId,
+            roadmap_id: roadmapId,
+            name: topicName,
+            order: topicOrder++,
+            status: 'pending',
+            notes: '',
+            resources: '',
+            created: Date.now()
+          });
+        }
+      }
+
+      if (typeof App.updateProgress === 'function') {
+        App.updateProgress();
+      }
+
+      App.navigate('roadmap/' + roadmapId);
+    } catch (err) {
+      showErrorInPanel('Error al guardar: ' + err.message);
+    }
+  }
+
+  /* ── Loading states ──────────────────────────────────────── */
+  function showLoading() {
+    state.isGenerating = true;
+    if ($btnGenerate) {
+      $btnGenerate.disabled = true;
+      $btnGenerate.innerHTML = '<span class="mono">&#8987;</span> Generando...';
+    }
+    if ($resultPanel) {
+      $resultPanel.style.display = '';
+    }
+    if ($statusTag) {
+      $statusTag.style.display = '';
+      $statusTag.textContent = 'Generando...';
+      $statusTag.className = 'tag';
+    }
+    if ($resultArea) {
+      $resultArea.innerHTML = `
+        <div class="empty empty-sm">
+          <div class="empty-ico">ia</div>
+          <div class="empty-hint">La IA esta generando tu roadmap personalizado...</div>
+          <div style="margin-top:12px;height:4px;background:var(--surface);border-radius:2px;overflow:hidden;">
+            <div id="gen-progress-bar" style="height:100%;width:0%;background:var(--accent);transition:width 0.3s ease;"></div>
+          </div>
+        </div>
+      `;
+
+      /* Animate progress bar */
+      requestAnimationFrame(() => {
+        const bar = document.getElementById('gen-progress-bar');
+        if (bar) {
+          setTimeout(() => { bar.style.width = '30%'; }, 100);
+          setTimeout(() => { bar.style.width = '65%'; }, 1000);
+          setTimeout(() => { bar.style.width = '90%'; }, 1800);
+        }
+      });
+    }
+  }
+
+  function hideLoading() {
+    state.isGenerating = false;
+    if ($btnGenerate) {
+      $btnGenerate.disabled = false;
+      $btnGenerate.innerHTML = '<span class="mono">ia</span> Generar roadmap';
+    }
+  }
+
+  /* ── Error display in panel ──────────────────────────────── */
+  function showErrorInPanel(msg) {
+    if (!$resultPanel || !$resultArea) {
+      /* Fallback: alert */
+      return;
+    }
+    $resultPanel.style.display = '';
+    $resultArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-body">
+          <div style="color:var(--error);font-weight:600;">
+            <span class="mono">&#9888;</span> ${escapeHtml(msg)}
+          </div>
+        </div>
+      </div>
+    `;
+    if ($statusTag) {
+      $statusTag.style.display = '';
+      $statusTag.textContent = 'Error';
+      $statusTag.className = 'tag';
+    }
+  }
+
+  /* ── Utils ───────────────────────────────────────────────── */
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  /* ── Public API ──────────────────────────────────────────── */
+  return {
+    init,
+    generateStructure,
+    renderResult,
+    saveGenerated,
+    showLoading,
+    hideLoading
+  };
+
+})();
