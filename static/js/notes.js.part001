@@ -1,0 +1,464 @@
+/**
+ * Notes - Modulo de notas/Bitacora del AI Learning OS
+ * Vista: #view-notes
+ * Namespace global: Notes
+ */
+const Notes = (() => {
+  'use strict';
+
+  /* ================================================================
+     SEED DATA
+   ================================================================ */
+  const NOTES_SEED = [
+    {
+      id: 'note_001',
+      title: 'Resumen: Modelos de Responsabilidad Compartida en Cloud',
+      content: [
+        '# Modelos de Responsabilidad Compartida',
+        '',
+        '## Concepto Clave',
+        'El modelo de responsabilidad compartida define quien es responsable de que en la seguridad cloud: el proveedor (CSP) o el cliente.',
+        '',
+        '## IaaS (AWS EC2, Azure VMs)',
+        '- **Proveedor**: Seguridad *de* la nube (infraestructura fisica, red, hipervisor)',
+        '- **Cliente**: Seguridad *en* la nube (SO, apps, datos, firewall, IAM, cifrado)',
+        '',
+        '## PaaS (AWS Elastic Beanstalk, Azure App Service)',
+        '- **Proveedor**: Runtime, middleware, sistema operativo',
+        '- **Cliente**: Aplicacion, datos, configuracion de IAM',
+        '',
+        '## SaaS (Office 365, Google Workspace)',
+        '- **Proveedor**: Casi toda la seguridad',
+        '- **Cliente**: Datos, acceso de usuarios, configuracion',
+        '',
+        '## Consejo para el examen',
+        '> En AWS, el cliente SIEMPRE es responsable de sus datos y el IAM, sin importar el modelo de servicio.',
+        '',
+        '---',
+        '*Creado durante estudio de AWS Certified Security - Specialty*'
+      ].join('\n'),
+      tags: ['cloud', 'aws', 'shared-responsibility', 'examen'],
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),  // 5d ago
+      updated_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString()       // 5h ago
+    },
+    {
+      id: 'note_002',
+      title: 'Cheatsheet: IAM Policies y JSON Structure',
+      content: [
+        '# IAM Policies - Cheatsheet',
+        '',
+        '## Estructura basica',
+        '```json',
+        '{',
+        '  "Version": "2012-10-17",',
+        '  "Statement": [',
+        '    {',
+        '      "Effect": "Allow|Deny",',
+        '      "Principal": { "AWS": "arn:aws:iam::ACCOUNT:root" },',
+        '      "Action": ["s3:GetObject", "s3:PutObject"],',
+        '      "Resource": "arn:aws:s3:::bucket/*",',
+        '      "Condition": {',
+        '        "Bool": { "aws:MultiFactorAuthPresent": "true" }',
+        '      }',
+        '    }',
+        '  ]',
+        '}',
+        '```',
+        '',
+        '## Elementos Importantes',
+        '- **Effect**: Allow o Deny. Deny SIEMPRE gana (explicit deny)',
+        '- **Principal**: Quien puede usar la politica (solo en resource-based policies)',
+        '- **Action**: Operaciones permitidas. Usa wildcards como `s3:*`',
+        '- **Resource**: ARN del recurso afectado',
+        '- **Condition**: Restricciones adicionales (IP, MFA, horario, etc.)',
+        '',
+        '## Tipos de Politicas',
+        '| Tipo | Alcance | Uso |',
+        '|------|---------|-----|',
+        '| Identity-based | Usuarios, Grupos, Roles | Politicas adjuntas a identidades |',
+        '| Resource-based | Recursos (S3, KMS, SQS) | Politicas en el recurso mismo |',
+        '| Permission boundaries | Roles/Usuarios | Limite maximo de permisos |',
+        '| Organizations SCP | Cuentas AWS | Control a nivel de organizacion |',
+        '',
+        '## Elementos clave del examen',
+        '- SCP no otorgan permisos, solo restringen',
+        '- Las politicas de bucket de S3 son resource-based',
+        '- `NotAction` invierte la logica (util para politicas de exclusion)',
+        '',
+        '---',
+        '*Fuente: AWS Documentation + A Cloud Guru course*'
+      ].join('\n'),
+      tags: ['iam', 'aws', 'json', 'policies', 'cheatsheet'],
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),  // 3d ago
+      updated_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()       // 1d ago
+    }
+  ];
+
+  /* ================================================================
+     ESTADO
+   ================================================================ */
+  const state = {
+    notes: [],           // Array de todas las notas
+    activeId: null,      // ID de la nota actualmente abierta
+    autoSaveTimer: null, // Referencia al timer de auto-guardado
+    lastSaved: {},       // Mapa id -> contenido guardado (para detectar cambios)
+    isDirty: false       // Flag de cambios sin guardar
+  };
+
+  /* ================================================================
+     CONFIGURACION
+   ================================================================ */
+  const AUTOSAVE_INTERVAL_MS = 30000; // 30 segundos
+
+  /* ================================================================
+     REFERENCIAS DOM (cacheadas en init)
+   ================================================================ */
+  let $btnNew, $sidebar, $editorPanel, $emptyPanel,
+      $titleInput, $contentInput, $btnSave, $btnDelete,
+      $saveIndicator;
+
+  /* ================================================================
+     HELPERS
+   ================================================================ */
+  function qs(selector, context) {
+    return (context || document).querySelector(selector);
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function generateId() {
+    return 'note_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
+  /**
+   * Formatea una fecha ISO a string legible en español
+   */
+  function formatDate(isoDate) {
+    if (!isoDate) return '';
+    const d = new Date(isoDate);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / (1000 * 60));
+    const diffHr  = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDay = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMin < 1) return 'Ahora mismo';
+    if (diffMin < 60) return `Hace ${diffMin} min`;
+    if (diffHr < 24) return `Hace ${diffHr}h`;
+    if (diffDay === 1) return 'Ayer';
+    if (diffDay < 7) return `Hace ${diffDay} dias`;
+
+    return d.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: now.getFullYear() !== d.getFullYear() ? 'numeric' : undefined
+    });
+  }
+
+  /**
+   * Fecha completa para el panel de detalle
+   */
+  function formatDateFull(isoDate) {
+    if (!isoDate) return '';
+    const d = new Date(isoDate);
+    return d.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  /* ================================================================
+     DB OPERATIONS
+   ================================================================ */
+  function getNotesFromDB() {
+    try {
+      const rows = DB.getAll('notes');
+      if (rows && rows.length > 0) {
+        // Ordenar por updated_at descendente
+        return rows.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      }
+    } catch (err) {
+      console.warn('[Notes] DB.getAll failed:', err);
+    }
+    return [];
+  }
+
+  function seedIfEmpty() {
+    try {
+      const existing = DB.getAll('notes');
+      if (!existing || existing.length === 0) {
+        NOTES_SEED.forEach(note => {
+          try { DB.insert('notes', note); } catch (e) { /* ignore dupes */ }
+        });
+      }
+    } catch (err) {
+      console.warn('[Notes] seedIfEmpty error:', err);
+    }
+  }
+
+  /* ================================================================
+     RENDER: SIDEBAR
+   ================================================================ */
+  function renderSidebar() {
+    if (!$sidebar) return;
+
+    state.notes = getNotesFromDB();
+
+    if (state.notes.length === 0) {
+      $sidebar.innerHTML = [
+        '<div class="empty empty-sm">',
+          '<div class="empty-hint">Sin notas aun.</div>',
+          '<div class="empty-hint">Crea tu primera nota para empezar.</div>',
+        '</div>'
+      ].join('');
+      return;
+    }
+
+    $sidebar.innerHTML = [
+      '<div class="topic-list">',
+      state.notes.map(note => {
+        const isActive = note.id === state.activeId;
+        const title = note.title || 'Sin titulo';
+        const shortTitle = title.length > 30 ? title.substring(0, 30) + '...' : title;
+        return [
+          '<div class="topic ' + (isActive ? 'is-active' : '') + '" data-note-id="' + note.id + '" style="cursor:pointer;padding:10px 14px;border-left:3px solid ' + (isActive ? 'var(--accent,#3b82f6)' : 'transparent') + ';">',
+            '<div style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;color:' + (isActive ? 'var(--accent,#3b82f6)' : 'inherit') + ';">' + escapeHtml(shortTitle) + '</div>',
+            '<div style="display:flex;align-items:center;gap:6px;">',
+              '<span class="mono" style="font-size:0.72rem;color:var(--text-3,#9ca3af);">' + formatDate(note.updated_at) + '</span>',
+              note.tags && note.tags.length > 0 ? '<span class="tag tag-blue" style="font-size:0.65rem;padding:1px 5px;">' + escapeHtml(note.tags[0]) + '</span>' : '',
+            '</div>',
+          '</div>'
+        ].join('');
+      }).join(''),
+      '</div>'
+    ].join('');
+
+    // Bind click en cada item del sidebar
+    $sidebar.querySelectorAll('.topic[data-note-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        openNote(item.dataset.noteId);
+      });
+    });
+  }
+
+  /* ================================================================
+     RENDER: INDICADOR DE GUARDADO
+   ================================================================ */
+  function showSaveIndicator(text, isSuccess) {
+    if (!$saveIndicator) return;
+    $saveIndicator.textContent = text;
+    $saveIndicator.style.color = isSuccess ? 'var(--success,#10b981)' : 'var(--text-3,#9ca3af)';
+    $saveIndicator.style.opacity = '1';
+    clearTimeout($saveIndicator._timer);
+    $saveIndicator._timer = setTimeout(() => {
+      $saveIndicator.style.opacity = '0.5';
+    }, 2000);
+  }
+
+  /* ================================================================
+     RENDER: EDITOR
+   ================================================================ */
+  function renderEditor() {
+    if (!$editorPanel || !$emptyPanel) return;
+
+    if (!state.activeId) {
+      $editorPanel.style.display = 'none';
+      $emptyPanel.style.display = 'flex';
+      return;
+    }
+
+    const note = state.notes.find(n => n.id === state.activeId);
+    if (!note) {
+      $editorPanel.style.display = 'none';
+      $emptyPanel.style.display = 'flex';
+      return;
+    }
+
+    $editorPanel.style.display = 'flex';
+    $emptyPanel.style.display = 'none';
+
+    // Solo actualizar inputs si el usuario no esta editando
+    if (document.activeElement !== $titleInput) {
+      $titleInput.value = note.title || '';
+    }
+    if (document.activeElement !== $contentInput) {
+      $contentInput.value = note.content || '';
+    }
+
+    // Mostrar fechas
+    const $dateInfo = $editorPanel.querySelector('.note-date-info');
+    if ($dateInfo) {
+      $dateInfo.innerHTML = `
+        <span class="mono">Creado: ${formatDateFull(note.created_at)}</span>
+        <span class="mono"> | Actualizado: ${formatDateFull(note.updated_at)}</span>
+      `;
+    }
+
+    // Tags
+    const $tagsWrap = $editorPanel.querySelector('.note-tags-wrap');
+    if ($tagsWrap) {
+      $tagsWrap.innerHTML = (note.tags || []).map(tag =>
+        `<span class="tag tag-blue">${escapeHtml(tag)}</span>`
+      ).join('');
+    }
+  }
+
+  /* ================================================================
+     ACCIONES
+   ================================================================ */
+  function openNote(id) {
+    // Guardar cambios pendientes antes de cambiar
+    if (state.isDirty && state.activeId) {
+      saveNote();
+    }
+    state.activeId = id;
+    state.isDirty = false;
+    renderSidebar();
+    renderEditor();
+    showSaveIndicator('');
+  }
+
+  function newNote() {
+    if (state.isDirty && state.activeId) {
+      saveNote();
+    }
+    const id = generateId();
+    const note = {
+      id,
+      title: '',
+      content: '',
+      tags: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    try {
+      DB.insert('notes', note);
+    } catch (err) {
+      console.warn('[Notes] Error creating note:', err);
+    }
+    state.notes = getNotesFromDB();
+    state.activeId = id;
+    state.isDirty = false;
+    renderSidebar();
+    renderEditor();
+    // Focus en el titulo
+    setTimeout(() => $titleInput && $titleInput.focus(), 50);
+  }
+
+  function saveNote() {
+    if (!state.activeId) return;
+    const note = state.notes.find(n => n.id === state.activeId);
+    if (!note) return;
+
+    const newTitle = $titleInput ? $titleInput.value.trim() : (note.title || '');
+    const newContent = $contentInput ? $contentInput.value : (note.content || '');
+
+    // Extraer tags del contenido (#tag)
+    const tagMatches = newContent.match(/#([a-zA-Z0-9_-]+)/g);
+    const newTags = tagMatches ? tagMatches.map(t => t.slice(1).toLowerCase()) : [];
+
+    const updated = {
+      ...note,
+      title: newTitle || 'Sin titulo',
+      content: newContent,
+      tags: newTags,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      DB.update('notes', updated);
+      state.notes = getNotesFromDB();
+      state.isDirty = false;
+      renderSidebar();
+      showSaveIndicator('Guardado', true);
+    } catch (err) {
+      console.warn('[Notes] Error saving note:', err);
+      showSaveIndicator('Error al guardar', false);
+    }
+  }
+
+  function deleteNote() {
+    if (!state.activeId) return;
+    const note = state.notes.find(n => n.id === state.activeId);
+    if (!note) return;
+    if (!confirm(`Eliminar nota "${note.title || 'Sin titulo'}"?`)) return;
+
+    try {
+      DB.delete('notes', note.id);
+      state.notes = getNotesFromDB();
+      state.activeId = null;
+      state.isDirty = false;
+      renderSidebar();
+      renderEditor();
+      showSaveIndicator('Nota eliminada', true);
+    } catch (err) {
+      console.warn('[Notes] Error deleting note:', err);
+      showSaveIndicator('Error al eliminar', false);
+    }
+  }
+
+  /* ================================================================
+     INIT
+   ================================================================ */
+  function init() {
+    // Cachear referencias DOM
+    $btnNew        = document.getElementById('btn-new-note');
+    $sidebar       = document.querySelector('.notes-sidebar .topic-list');
+    $editorPanel   = document.querySelector('.notes-editor');
+    $emptyPanel    = document.querySelector('.notes-empty');
+    $titleInput    = document.getElementById('note-title');
+    $contentInput  = document.getElementById('note-content');
+    $btnSave       = document.getElementById('btn-save-note');
+    $btnDelete     = document.getElementById('btn-delete-note');
+    $saveIndicator = document.querySelector('.save-indicator');
+
+    seedIfEmpty();
+    state.notes = getNotesFromDB();
+    renderSidebar();
+    renderEditor();
+
+    // Eventos
+    if ($btnNew)       $btnNew.addEventListener('click', newNote);
+    if ($btnSave)      $btnSave.addEventListener('click', saveNote);
+    if ($btnDelete)    $btnDelete.addEventListener('click', deleteNote);
+
+    // Auto-guardado al escribir
+    if ($titleInput) {
+      $titleInput.addEventListener('input', () => {
+        state.isDirty = true;
+        showSaveIndicator('Sin guardar...');
+      });
+    }
+    if ($contentInput) {
+      $contentInput.addEventListener('input', () => {
+        state.isDirty = true;
+        showSaveIndicator('Sin guardar...');
+      });
+    }
+
+    // Guardar con Ctrl+S
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveNote();
+      }
+    });
+
+    // Auto-guardado periodico
+    setInterval(() => {
+      if (state.isDirty && state.activeId) {
+        saveNote();
+      }
+    }, AUTOSAVE_INTERVAL_MS);
+  }
+
+  return { init };
+})();
