@@ -1,0 +1,78 @@
+' + projectId + '"]');
+        if (detailPanel && detailPanel.style.display !== 'none') {
+            var detailBarFill = detailPanel.querySelector('.bar-fill');
+            var detailPct = detailPanel.querySelector('.project-detail-pct');
+            if (detailBarFill) {
+                detailBarFill.style.width = progress.percent + '%';
+            }
+            if (detailPct) {
+                detailPct.textContent = progress.percent + '% (' + progress.done + '/' + progress.total + ')';
+            }
+
+            // Actualizar estado del tag en el detalle
+            var detailTag = detailPanel.querySelector('.project-detail-title .tag');
+            if (detailTag && project) {
+                detailTag.className = 'tag ' + _getStatusClass(project.status);
+                detailTag.textContent = _getStatusLabel(project.status);
+            }
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       UTILIDADES
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Obtiene la clase CSS para un estado de proyecto.
+     * @param {string} status — estado del proyecto
+     * @returns {string} clase CSS
+     * @private
+     */
+    function _getStatusClass(status) {
+        switch (status) {
+            case 'done':        return 'done';
+            case 'in_progress': return 'in_progress';
+            default:            return 'pending';
+        }
+    }
+
+    /**
+     * Obtiene la etiqueta legible para un estado de proyecto.
+     * @param {string} status — estado del proyecto
+     * @returns {string} etiqueta
+     * @private
+     */
+    function _getStatusLabel(status) {
+        switch (status) {
+            case 'done':        return 'Completado';
+            case 'in_progress': return 'En progreso';
+            default:            return 'Pendiente';
+        }
+    }
+
+    /**
+     * Escapa caracteres HTML especiales.
+     * @param {string} text — texto a escapar
+     * @returns {string} texto escapado
+     * @private
+     */
+    function _esc(text) {
+        if (typeof text !== 'string') return String(text || '');
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       API PUBLICA
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    return {
+        init: init,
+        renderForPhase: renderForPhase,
+        toggleRequirement: toggleRequirement,
+        getProjectProgress: getProjectProgress,
+        showProjectDetail: showProjectDetail
+    };
+
+})();
