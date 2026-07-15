@@ -1,0 +1,212 @@
+/**
+ * ============================================================================
+ * projects.js — F8: Contrato de Proyectos GitHub
+ * ============================================================================
+ * Maneja los proyectos practicos por fase: renderizado, requisitos,
+ * progreso y panel de detalle con checklist.
+ *
+ * Namespace global: Projects
+ * Depende de: DB (db.js)
+ * ============================================================================
+ */
+
+var Projects = (function () {
+    'use strict';
+
+    /* ──────────────────────── constantes ──────────────────────── */
+
+    /** Colores para el punto indicador segun el tipo de requisito */
+    var KIND_COLORS = {
+        doc:      'var(--text-faint)',   // gris
+        evidence: 'var(--yellow)',       // amarillo
+        artifact: 'var(--green)'         // verde
+    };
+
+    /** Etiquetas legibles para los tipos de requisito */
+    var KIND_LABELS = {
+        doc:      'Documento',
+        evidence: 'Evidencia',
+        artifact: 'Artefacto'
+    };
+
+    /** Estado CSS para requisitos */
+    var REQ_STATUS = {
+        done: 'done',
+        todo: ''
+    };
+
+    /* ──────────────────────── estado interno ──────────────────────── */
+
+    /** Cache del panel de detalle activo */
+    var _activeDetailPanel = null;
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       INICIALIZACION
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Inicializa el modulo de proyectos.
+     */
+    function init() {
+        // El modulo se inicializa lazy: los proyectos se renderizan
+        // bajo demanda cuando se muestra una vista de fase.
+        console.log('[Projects] Modulo inicializado.');
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       RENDERIZADO POR FASE
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Renderiza los proyectos de una fase dentro de un contenedor.
+     * Muestra cada proyecto con su nombre, estado, y link a GitHub si existe.
+     *
+     * @param {number} phaseId  — ID de la fase
+     * @param {Element} container — elemento DOM donde renderizar
+     */
+    function renderForPhase(phaseId, container) {
+        if (!container) {
+            console.warn('[Projects] renderForPhase: container nulo');
+            return;
+        }
+
+        var projects = DB.query('projects', function (p) {
+            return p.phase_id === phaseId;
+        });
+
+        if (!projects.length) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var html = '<div class="projects-phase">';
+
+        projects.forEach(function (project) {
+            var progress = getProjectProgress(project.id);
+            var statusClass = _getStatusClass(project.status);
+            var statusLabel = _getStatusLabel(project.status);
+
+            html +=
+                '<div class="project-item ' + statusClass + '" data-project-id="' + project.id + '">\n' +
+                '  <div class="project-main">\n' +
+                '    <div class="project-info">\n' +
+                '      <div class="project-name-row">\n' +
+                '        <svg class="ico"><use href="#i-github"></use></svg>\n' +
+                '        <strong>' + _esc(project.repo_name) + '</strong>\n' +
+                '        <span class="tag tag-sm ' + statusClass + '">' + statusLabel + '</span>\n' +
+                '      </div>\n' +
+                '      <div class="project-meta">\n' +
+                '        <span class="project-progress-bar">\n' +
+                '          <div class="bar bar-sm"><div class="bar-fill" style="width:' + progress.percent + '%"></div></div>\n' +
+                '          <em>' + progress.done + '/' + progress.total + '</em>\n' +
+                '        </span>\n' +
+                '      </div>\n' +
+                '    </div>\n' +
+                '    <div class="project-actions">\n';
+
+            if (project.repo_url) {
+                html +=
+                    '      <a href="' + _esc(project.repo_url) + '" target="_blank" ' +
+                    'class="btn btn-ghost btn-sm" title="Abrir en GitHub">\n' +
+                    '        <svg class="ico"><use href="#i-externo"></use></svg>\n' +
+                    '      </a>\n';
+            }
+
+            html +=
+                '      <button class="btn btn-ghost btn-sm btn-detail" ' +
+                'data-project-id="' + project.id + '" title="Ver detalle">\n' +
+                '        <svg class="ico"><use href="#i-info"></use></svg> Detalle\n' +
+                '      </button>\n' +
+                '    </div>\n' +
+                '  </div>\n' +
+                '  <div class="project-detail" data-detail-for="' + project.id + '" style="display:none"></div>\n' +
+                '</div>\n';
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+
+        // Adjuntar event listeners
+        _attachPhaseListeners(container);
+    }
+
+    /**
+     * Adjunta event listeners a los elementos de un contenedor de fase.
+     * @param {Element} container — contenedor
+     * @private
+     */
+    function _attachPhaseListeners(container) {
+        container.addEventListener('click', function (e) {
+            // Boton de detalle
+            var detailBtn = e.target.closest('.btn-detail');
+            if (detailBtn) {
+                var pid = parseInt(detailBtn.dataset.projectId, 10);
+                showProjectDetail(pid);
+                return;
+            }
+
+            // Click en un requisito dentro del panel de detalle
+            var reqEl = e.target.closest('.project-req');
+            if (reqEl && reqEl.dataset.reqId) {
+                toggleRequirement(parseInt(reqEl.dataset.reqId, 10));
+                return;
+            }
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       INTERACCION: REQUISITOS
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Marca o desmarca un requisito de proyecto.
+     * Actualiza project_requirements en DB, recalcula progreso del proyecto,
+     * y si todos los reqs estan done -> proyecto pasa a done.
+     * La UI se actualiza inline sin re-renderizar todo.
+     *
+     * @param {number} reqId — ID del requisito
+     */
+    function toggleRequirement(reqId) {
+        var req = DB.getById('project_requirements', reqId);
+        if (!req) {
+            console.warn('[Projects] toggleRequirement: req no encontrado:', reqId);
+            return;
+        }
+
+        var newDone = !req.done;
+        DB.update('project_requirements', reqId, { done: newDone });
+
+        // Recalcular progreso del proyecto
+        var projectId = req.project_id;
+        var progress = getProjectProgress(projectId);
+
+        // Si todos los reqs estan done -> proyecto pasa a done
+        var project = DB.getById('projects', projectId);
+        if (project) {
+            var newProjectStatus = project.status;
+            if (progress.done === progress.total && progress.total > 0) {
+                newProjectStatus = 'done';
+            } else if (project.status === 'done' && progress.done < progress.total) {
+                newProjectStatus = 'in_progress';
+            }
+            if (newProjectStatus !== project.status) {
+                DB.update('projects', projectId, { status: newProjectStatus });
+            }
+        }
+
+        // Actualizar UI inline
+        _updateRequirementInline(reqId, newDone);
+        _updateProjectProgressInline(projectId, progress);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       PROGRESO
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Calcula el progreso de un proyecto.
+     * @param {number} projectId — ID del proyecto
+     * @returns {Object} { done, total, percent }
+     */
+    function getProjectProgress(projectId) {
+ 
