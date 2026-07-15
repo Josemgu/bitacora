@@ -1,0 +1,36 @@
+    { id: 124, topic_id: 25, title: "Testear con alertas reales del entorno",                order: 4, done: false, done_at: null, notes: "" },
+    { id: 125, topic_id: 25, title: "Refinar respuestas con feedback manual",                order: 5, done: false, done_at: null, notes: "" },
+
+    // --- Fase 7: topic 26 "8-12 repos documentados" (todo) ---
+    { id: 126, topic_id: 26, title: "Auditar repos existentes y listar gaps",                order: 1, done: false, done_at: null, notes: "" },
+    { id: 127, topic_id: 26, title: "Crear READMEs profesionales con badges y diagramas",    order: 2, done: false, done_at: null, notes: "" },
+    { id: 128, topic_id: 26, title: "Documentar arquitectura de cada proyecto",              order: 3, done: false, done_at: null, notes: "" },
+    { id: 129, topic_id: 26, title: "Añadir diagramas Mermaid/ASCII a cada repo",            order: 4, done: false, done_at: null, notes: "" },
+    { id: 130, topic_id: 26, title: "Publicar repos en GitHub como portfolio público",       order: 5, done: false, done_at: null, notes: "" },
+
+    // --- Fase 7: topic 27 "CV en formato canadiense" (todo) ---
+    { id: 131, topic_id: 27, title: "Investigar formato de CV canadiense ATS-friendly",      order: 1, done: false, done_at: null, notes: "" },
+    { id: 132, topic_id: 27, title: "Crear versión en inglés del CV",                        order: 2, done: false, done_at: null, notes: "" },
+    { id: 133, topic_id: 27, title: "Adaptar experiencia al mercado canadiense de tech",     order: 3, done: false, done_at: null, notes: "" },
+    { id: 134, topic_id: 27, title: "Destacar proyectos de homelab con métricas",            order: 4, done: false, done_at: null, notes: "" },
+    { id: 135, topic_id: 27, title: "Revisar CV con mentor o comunidad",                     order: 5, done: false, done_at: null, notes: "" },
+
+    // --- Fase 7: topic 28 "Simulacros de entrevista" (todo) ---
+    { id: 136, topic_id: 28, title: "Compilar lista de 50 preguntas técnicas comunes",       order: 1, done: false, done_at: null, notes: "" },
+    { id: 137, topic_id: 28, title: "Practicar behavioral questions formato STAR",           order: 2, done: false, done_at: null, notes: "" },
+    { id: 138, topic_id: 28, title: "Grabar simulacros en video y autoevaluar",              order: 3, done: false, done_at: null, notes: "" },
+    { id: 139, topic_id: 28, title: "Hacer mock interviews con compañeros de estudio",       order: 4, done: false, done_at: null, notes: "" },
+    { id: 140, topic_id: 28, title: "Programar entrevistas reales y documentar feedback",    order: 5, done: false, done_at: null, notes: "" },
+  ],
+};
+
+// ===========================================================================
+// Exportacion universal (Node.js + navegador)
+// ===========================================================================
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { SEED_DATA };
+}
+
+if (typeof window !== "undefined") {
+  window.SEED_DATA = SEED_DATA;
+}

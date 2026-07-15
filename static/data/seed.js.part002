@@ -1,0 +1,182 @@
+ull,
+      status: "pending",
+    },
+    {
+      id: 10,
+      phase_id: 8,
+      repo_name: "portfolio",
+      repo_url: null,
+      status: "pending",
+    },
+  ],
+
+  // =========================================================================
+  // 5. PROJECT REQUIREMENTS — Requisitos de evidencia por proyecto
+  // =========================================================================
+  project_requirements: [
+    // --- linux-hardened-server (project_id=2) ---
+    {
+      id: 1,
+      project_id: 2,
+      requirement: "README con topologia y hardware",
+      kind: "doc",
+      done: false,
+      order: 1,
+    },
+    {
+      id: 2,
+      project_id: 2,
+      requirement: "CIS Benchmark aplicado punto por punto",
+      kind: "evidence",
+      done: false,
+      order: 2,
+    },
+    {
+      id: 3,
+      project_id: 2,
+      requirement: "SSH solo por llave - mostrar config",
+      kind: "evidence",
+      done: false,
+      order: 3,
+    },
+    {
+      id: 4,
+      project_id: 2,
+      requirement: "fail2ban, sudo logging, AppArmor",
+      kind: "artifact",
+      done: false,
+      order: 4,
+    },
+    {
+      id: 5,
+      project_id: 2,
+      requirement: "rsyslog reenviando a servidor central",
+      kind: "artifact",
+      done: false,
+      order: 5,
+    },
+    {
+      id: 6,
+      project_id: 2,
+      requirement: "Backup restaurado y verificado",
+      kind: "evidence",
+      done: false,
+      order: 6,
+    },
+
+    // --- homelab-cloud-security (project_id=1) ---
+    {
+      id: 7,
+      project_id: 1,
+      requirement: "README con topologia planeada y hardware",
+      kind: "doc",
+      done: false,
+      order: 1,
+    },
+    {
+      id: 8,
+      project_id: 1,
+      requirement: "Diagrama de 4 VLANs",
+      kind: "evidence",
+      done: false,
+      order: 2,
+    },
+    {
+      id: 9,
+      project_id: 1,
+      requirement: "Post de LinkedIn mostrando hardware",
+      kind: "doc",
+      done: false,
+      order: 3,
+    },
+  ],
+
+  // =========================================================================
+  // 6. AI PROVIDERS — Plantillas de proveedores de IA
+  // =========================================================================
+  ai_providers: [
+    {
+      id: 1,
+      name: "OpenAI",
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      model: "gpt-4o-mini",
+      env_key_name: "OPENAI_API_KEY",
+      active: false,
+    },
+    {
+      id: 2,
+      name: "Anthropic",
+      endpoint: "https://api.anthropic.com/v1/messages",
+      model: "claude-3-haiku-20240307",
+      env_key_name: "ANTHROPIC_API_KEY",
+      active: false,
+    },
+    {
+      id: 3,
+      name: "Google",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+      model: "gemini-1.5-flash",
+      env_key_name: "GOOGLE_API_KEY",
+      active: false,
+    },
+    {
+      id: 4,
+      name: "Ollama",
+      endpoint: "http://localhost:11434/api/chat",
+      model: "llama3.2",
+      env_key_name: "",
+      active: false,
+    },
+  ],
+
+  // =========================================================================
+  // 7. LOG ENTRIES — Registro diario de aprendizaje (vacío al inicio)
+  // =========================================================================
+  log_entries: [],
+
+  // =========================================================================
+  // 8. HEALTH EVENTS — Eventos de salud/fitness (vacío al inicio)
+  // =========================================================================
+  health_events: [],
+
+  // =========================================================================
+  // 9. RESOURCE QUEUE — Cola de recursos por revisar (vacío al inicio)
+  // =========================================================================
+  resource_queue: [],
+
+  // =========================================================================
+  // 10. SUBTOPICS — Subtemas accionables por topic (spec v2)
+  // =========================================================================
+  subtopics: [
+    // --- Fase 0: topic 1 "Proxmox VE instalado y configurado" (done) ---
+    { id: 1,  topic_id: 1, title: "Descargar ISO de Proxmox VE",                              order: 1, done: true, done_at: "2026-10-01T00:00:00Z", notes: "" },
+    { id: 2,  topic_id: 1, title: "Crear USB booteable con Ventoy/Rufus",                     order: 2, done: true, done_at: "2026-10-02T00:00:00Z", notes: "" },
+    { id: 3,  topic_id: 1, title: "Instalar Proxmox en hardware dedicado",                    order: 3, done: true, done_at: "2026-10-04T00:00:00Z", notes: "" },
+    { id: 4,  topic_id: 1, title: "Configurar almacenamiento ZFS",                            order: 4, done: true, done_at: "2026-10-07T00:00:00Z", notes: "" },
+    { id: 5,  topic_id: 1, title: "Crear VMs iniciales y configurar red",                     order: 5, done: true, done_at: "2026-10-10T00:00:00Z", notes: "" },
+
+    // --- Fase 0: topic 2 "pfSense como firewall/router" (done) ---
+    { id: 6,  topic_id: 2, title: "Descargar imagen ISO de pfSense CE",                       order: 1, done: true, done_at: "2026-10-11T00:00:00Z", notes: "" },
+    { id: 7,  topic_id: 2, title: "Crear VM en Proxmox con 2 NICs (WAN/LAN)",                 order: 2, done: true, done_at: "2026-10-12T00:00:00Z", notes: "" },
+    { id: 8,  topic_id: 2, title: "Configurar interfaces WAN y LAN",                          order: 3, done: true, done_at: "2026-10-13T00:00:00Z", notes: "" },
+    { id: 9,  topic_id: 2, title: "Habilitar DHCP en interfaz LAN",                           order: 4, done: true, done_at: "2026-10-14T00:00:00Z", notes: "" },
+    { id: 10, topic_id: 2, title: "Configurar reglas NAT y acceso a internet",                order: 5, done: true, done_at: "2026-10-15T00:00:00Z", notes: "" },
+
+    // --- Fase 0: topic 3 "4 VLANs definidas" (done) ---
+    { id: 11, topic_id: 3, title: "Crear VLAN 10 Management en pfSense",                     order: 1, done: true, done_at: "2026-10-16T00:00:00Z", notes: "" },
+    { id: 12, topic_id: 3, title: "Crear VLAN 20 Servers en pfSense",                       order: 2, done: true, done_at: "2026-10-17T00:00:00Z", notes: "" },
+    { id: 13, topic_id: 3, title: "Crear VLAN 30 Users en pfSense",                         order: 3, done: true, done_at: "2026-10-18T00:00:00Z", notes: "" },
+    { id: 14, topic_id: 3, title: "Crear VLAN 40 DMZ en pfSense",                           order: 4, done: true, done_at: "2026-10-19T00:00:00Z", notes: "" },
+    { id: 15, topic_id: 3, title: "Configurar trunk port en switch físico",                 order: 5, done: true, done_at: "2026-10-20T00:00:00Z", notes: "" },
+
+    // --- Fase 1: topic 4 "CIS Benchmark aplicado manualmente" (done) ---
+    { id: 16, topic_id: 4, title: "Descargar CIS Benchmark para Ubuntu 22.04",              order: 1, done: true, done_at: "2026-11-02T00:00:00Z", notes: "" },
+    { id: 17, topic_id: 4, title: "Ejecutar script de auditoría CIS y revisar resultados",  order: 2, done: true, done_at: "2026-11-05T00:00:00Z", notes: "" },
+    { id: 18, topic_id: 4, title: "Aplicar reglas de configuración de red y firewall",      order: 3, done: true, done_at: "2026-11-08T00:00:00Z", notes: "" },
+    { id: 19, topic_id: 4, title: "Configurar políticas de contraseñas y bloqueo de cuentas",order: 4, done: true, done_at: "2026-11-12T00:00:00Z", notes: "" },
+    { id: 20, topic_id: 4, title: "Verificar cumplimiento con scan final",                  order: 5, done: true, done_at: "2026-11-15T00:00:00Z", notes: "" },
+
+    // --- Fase 1: topic 5 "SSH solo por llave, password auth off" (done) ---
+    { id: 21, topic_id: 5, title: "Generar par de claves SSH ed25519 local",                order: 1, done: true, done_at: "2026-11-16T00:00:00Z", notes: "" },
+    { id: 22, topic_id: 5, title: "Copiar clave pública a todos los servidores",            order: 2, done: true, done_at: "2026-11-17T00:00:00Z", notes: "" },
+    { id: 23, topic_id: 5, title: "Editar sshd_config: PasswordAuthentication no",         order: 3, done: true, done_at: "2026-11-18T00:00:00Z", notes: "" },
