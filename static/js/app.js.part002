@@ -1,0 +1,286 @@
+
+    initMesaCanvas();
+  };
+
+  /**
+   * Inicializa el canvas interactivo de la mesa de trabajo.
+   */
+  function initMesaCanvas() {
+    const canvas = document.getElementById('work-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let currentTool = 'pen';
+
+    // Ajustar canvas al contenedor
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width - 80; // espacio para tools
+      canvas.height = rect.height;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', debounce(resizeCanvas, 200));
+
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX || e.touches[0].clientX) - rect.left,
+        y: (e.clientY || e.touches[0].clientY) - rect.top
+      };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (currentTool === 'clear') { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+      drawing = true;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!drawing) return;
+      const pos = getPos(e);
+      if (currentTool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = 20;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.lineWidth = 2;
+      }
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    });
+
+    canvas.addEventListener('mouseup', () => { drawing = false; });
+    canvas.addEventListener('mouseleave', () => { drawing = false; });
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (currentTool === 'clear') { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+      drawing = true;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!drawing) return;
+      const pos = getPos(e);
+      if (currentTool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = 20;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.lineWidth = 2;
+      }
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => { drawing = false; });
+
+    // Tool buttons
+    const tools = canvas.parentElement.querySelectorAll('.mesa-tool');
+    tools.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tool = btn.dataset.tool;
+        if (tool === 'clear') {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        } else if (tool === 'save') {
+          const link = document.createElement('a');
+          link.download = 'bitacora-mesa-' + new Date().toISOString().slice(0, 10) + '.png';
+          link.href = canvas.toDataURL();
+          link.click();
+        } else {
+          currentTool = tool;
+          tools.forEach(b => b.classList.remove('is-active'));
+          btn.classList.add('is-active');
+        }
+      });
+    });
+    if (tools[0]) tools[0].classList.add('is-active');
+  }
+
+  // ---------- CHAT ----------
+  views.chat = function () {
+    if (!state.chatInitialized && typeof AIChat !== 'undefined') {
+      AIChat.init();
+      state.chatInitialized = true;
+    }
+    // Enfocar input
+    setTimeout(() => {
+      const input = $('.chat-input');
+      if (input) input.focus();
+    }, 100);
+  };
+
+  // ---------- SISTEMA ----------
+  views.sistema = function () {
+    if (typeof Health !== 'undefined') {
+      if (Health.renderStatus) Health.renderStatus();
+      if (Health.renderActivity) Health.renderActivity();
+    }
+    if (typeof Profile !== 'undefined' && Profile.render) {
+      Profile.render();
+    }
+  };
+
+  // ---------- CONFIG ----------
+  views.config = function () {
+    if (typeof Config !== 'undefined' && Config.render) {
+      Config.render();
+    }
+  };
+
+  // ---------- COLA ----------
+  views.cola = function () {
+    if (!state.colaViewCreated) {
+      const main = $('.main');
+      if (!main) return;
+      let colaSection = $('#view-cola');
+      if (!colaSection) {
+        colaSection = document.createElement('section');
+        colaSection.className = 'view';
+        colaSection.id = 'view-cola';
+        colaSection.innerHTML = `
+          <div class="view-bar">
+            <span class="crumb">Cola de aprobacion</span>
+            <span class="view-bar-meta">Recursos pendientes por revisar</span>
+          </div>
+          <div class="view-body">
+            <div class="queue-container"></div>
+          </div>
+        `;
+        main.appendChild(colaSection);
+      }
+      state.colaViewCreated = true;
+    }
+    if (typeof Queue !== 'undefined' && Queue.render) {
+      Queue.render();
+    }
+  };
+
+  // ---------- IMPORTAR ROADMAP ----------
+  views.import = function () {
+    if (typeof ImportRoadmap !== 'undefined' && ImportRoadmap.init) {
+      ImportRoadmap.init();
+    }
+  };
+
+  // ---------- GENERAR ROADMAP CON IA ----------
+  views.generate = function () {
+    if (typeof GenerateRoadmap !== 'undefined' && GenerateRoadmap.init) {
+      GenerateRoadmap.init();
+    }
+  };
+
+  // ---------- LABORATORIOS ----------
+  views.labs = function () {
+    if (typeof Labs !== 'undefined' && Labs.init) {
+      Labs.init();
+    }
+  };
+
+  // ---------- TUTORIALES ----------
+  views.tutorials = function () {
+    if (typeof Tutorials !== 'undefined' && Tutorials.init) {
+      Tutorials.init();
+    }
+  };
+
+  // ---------- MENSAJES ----------
+  views.messages = function () {
+    if (typeof Messages !== 'undefined' && Messages.init) {
+      Messages.init();
+    }
+  };
+
+  // ---------- NOTAS ----------
+  views.notes = function () {
+    if (typeof Notes !== 'undefined' && Notes.init) {
+      Notes.init();
+    }
+  };
+
+  /* ================================================================
+     ROUTER
+  ================================================================ */
+
+  /**
+   * Mapeo de nombres de vista a funcion de renderizado.
+   */
+  const VIEW_MAP = {
+    inicio: views.inicio,
+    roadmap: views.roadmap,
+    recursos: views.recursos,
+    horario: views.horario,
+    mesa: views.mesa,
+    chat: views.chat,
+    sistema: views.sistema,
+    config: views.config,
+    cola: views.cola,
+    import: views.import,
+    generate: views.generate,
+    labs: views.labs,
+    tutorials: views.tutorials,
+    messages: views.messages,
+    notes: views.notes
+  };
+
+  /**
+   * Maneja la navegacion por hash.
+   */
+  function router() {
+    const hash = window.location.hash || '#inicio';
+    const viewName = getHashView();
+    const params = getHashParams();
+
+    // Guardar vista anterior
+    state.previousView = state.currentView;
+    state.currentView = viewName;
+
+    // Ocultar vista anterior
+    const prevView = state.previousView ? $(`#view-${state.previousView}`) : null;
+    if (prevView) prevView.classList.remove('is-visible');
+
+    // Si la vista no existe en el mapa, default a inicio
+    const viewFn = VIEW_MAP[viewName];
+    if (!viewFn) {
+      window.location.hash = '#inicio';
+      return;
+    }
+
+    // Asegurar que el elemento DOM de la vista exista
+    let viewEl = $(`#view-${viewName}`);
+
+    // Para cola, crear dinamicamente
+    if (viewName === 'cola' && !viewEl) {
+      views.cola(); // Esto crea el elemento
+      viewEl = $('#view-cola');
+    }
+
+    if (!viewEl) {
+      console.warn(`[App] Vista #view-${viewName} no encontrada.`);
+      window.location.hash = '#inicio';
+      return;
+    }
+
+    // Mostrar nueva vista
+    viewEl.classList.add('is-visible');
+
+    // Actualizar sidebar
+    updateSidebar();
+
+    // Cerrar sidebar en movil
+    closeSidebar();
+
+    // Re

@@ -1,0 +1,238 @@
+/**
+ * ai-chat.js — F3: Proveedor de IA con multi-backend, streaming SSE y chat UI.
+ * Namespace global: AIChat
+ * Dependencias: DB (js/db.js)
+ *
+ * Soporta: OpenAI, Anthropic, Google Gemini, Ollama (local).
+ * La clave API se mantiene SOLO en memoria (variable JS), nunca en localStorage.
+ */
+const AIChat = (() => {
+  'use strict';
+
+  /* ═════════════════════════════  ESTADO  ═════════════════════════════ */
+
+  const state = {
+    providers: [],          // Lista de proveedores cargados desde DB
+    activeProvider: null,   // Proveedor seleccionado o 'local' | null
+    messages: [],           // Historial de mensajes de la sesion
+    apiKeys: new Map(),     // Claves API en memoria: providerId -> key
+    isStreaming: false,     // Flag para evitar envios simultaneos
+    abortCtrl: null         // AbortController para cancelar requests
+  };
+
+  /* Referencias DOM (cache) */
+  let $container = null;
+  let $providerSelect = null;
+  let $chatLog = null;
+  let $chatInput = null;
+  let $sendBtn = null;
+  let $keyInput = null;
+  let $keyNote = null;
+
+  /* ═════════════════════════════  CONSTANTES  ═════════════════════════════ */
+
+  const STORAGE_KEY = 'bitacora_ai_chat_history';
+  const TIMEOUT_MS = 30000;
+
+  /* Plantillas de endpoint por proveedor */
+  const ENDPOINT_TEMPLATES = {
+    openai:   'https://api.openai.com/v1/chat/completions',
+    anthropic:'https://api.anthropic.com/v1/messages',
+    google:   'https://generativelanguage.googleapis.com/v1beta/models',
+    ollama:   'http://localhost:11434/api/chat'
+  };
+
+  /* ═════════════════════════════  UTILIDADES  ═════════════════════════════ */
+
+  const esc = (str) => {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+  };
+
+  const nowISO = () => new Date().toISOString();
+
+  /** Muestra una clave API enmascarada: sk-xxxxxxxxxxxx...4f2a */
+  const maskKey = (key) => {
+    if (!key || key.length < 8) return '...';
+    const vis = 4; // caracteres visibles al inicio (despues del prefijo)
+    const end = 4; // caracteres visibles al final
+    const prefix = key.slice(0, vis);
+    const suffix = key.slice(-end);
+    return prefix + '...' + suffix;
+  };
+
+  /** Extrae el nombre de la env var sin el prefijo $ */
+  const envName = (raw) => raw ? raw.replace(/^\$/, '') : '';
+
+  /* ═════════════════════════════  PROVEEDORES  ═════════════════════════════ */
+
+  /**
+   * Proveedor OpenAI.
+   * Usa la API de chat completions con streaming SSE.
+   */
+  const openaiProvider = {
+    name: 'OpenAI',
+
+    async chat(messages, opts = {}) {
+      const { apiKey, model = 'gpt-4o-mini', endpoint = ENDPOINT_TEMPLATES.openai } = opts;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({ model, messages, stream: false })
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || '';
+    },
+
+    async *chatStream(messages, opts = {}) {
+      const { apiKey, model = 'gpt-4o-mini', endpoint = ENDPOINT_TEMPLATES.openai, signal } = opts;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({ model, messages, stream: true })
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      if (!res.body) return;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t || !t.startsWith('data:')) continue;
+            const payload = t.slice(5).trim();
+            if (payload === '[DONE]') return;
+            try {
+              const json = JSON.parse(payload);
+              const chunk = json.choices?.[0]?.delta?.content;
+              if (chunk) yield chunk;
+            } catch { /* ignora JSON malformado */ }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  };
+
+  /**
+   * Proveedor Anthropic.
+   * El system prompt va como parametro separado (no en messages).
+   */
+  const anthropicProvider = {
+    name: 'Anthropic',
+
+    async chat(messages, opts = {}) {
+      const { apiKey, model = 'claude-3-haiku-20240307', endpoint = ENDPOINT_TEMPLATES.anthropic } = opts;
+      const { system, userMessages } = _splitSystem(messages);
+      const body = { model, max_tokens: 4096, messages: userMessages };
+      if (system) body.system = system;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      const data = await res.json();
+      return data.content?.[0]?.text || '';
+    },
+
+    async *chatStream(messages, opts = {}) {
+      const { apiKey, model = 'claude-3-haiku-20240307', endpoint = ENDPOINT_TEMPLATES.anthropic, signal } = opts;
+      const { system, userMessages } = _splitSystem(messages);
+      const body = { model, max_tokens: 4096, messages: userMessages, stream: true };
+      if (system) body.system = system;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      if (!res.body) return;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t.startsWith('event:') && !t.startsWith('data:')) continue;
+            if (t.startsWith('event:')) continue;
+            const payload = t.slice(5).trim();
+            if (payload === '[DONE]') return;
+            try {
+              const json = JSON.parse(payload);
+              if (json.type === 'content_block_delta') {
+                const chunk = json.delta?.text;
+                if (chunk) yield chunk;
+              }
+            } catch { /* ignora */ }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  };
+
+  /**
+   * Proveedor Google Gemini.
+   * Usa generativelanguage.googleapis.com.
+   */
+  const googleProvider = {
+    name: 'Google',
+
+    async chat(messages, opts = {}) {
+      const { apiKey, model = 'gemini-1.5-flash', endpoint } = opts;
+      const modelName = model.includes('/') ? model : `models/${model}`;
+      const url = endpoint || `${ENDPOINT_TEMPLATES.google}/${modelName}:generateContent?key=${apiKey}`;
+      const contents = _toGoogleContents(messages);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents })
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text ||

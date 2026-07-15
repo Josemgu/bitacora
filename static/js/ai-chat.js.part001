@@ -1,0 +1,232 @@
+ '';
+    },
+
+    async *chatStream(messages, opts = {}) {
+      const { apiKey, model = 'gemini-1.5-flash', endpoint, signal } = opts;
+      const modelName = model.includes('/') ? model : `models/${model}`;
+      const url = endpoint || `${ENDPOINT_TEMPLATES.google}/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`;
+      const contents = _toGoogleContents(messages);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents })
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      if (!res.body) return;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t.startsWith('data:')) continue;
+            const payload = t.slice(5).trim();
+            try {
+              const json = JSON.parse(payload);
+              const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (chunk) yield chunk;
+            } catch { /* ignora */ }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  };
+
+  /**
+   * Proveedor Ollama (local).
+   * No requiere clave API. Corre en localhost:11434.
+   */
+  const ollamaProvider = {
+    name: 'Ollama',
+
+    async chat(messages, opts = {}) {
+      const { model = 'llama3.2', endpoint = ENDPOINT_TEMPLATES.ollama } = opts;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, stream: false })
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      const data = await res.json();
+      return data.message?.content || '';
+    },
+
+    async *chatStream(messages, opts = {}) {
+      const { model = 'llama3.2', endpoint = ENDPOINT_TEMPLATES.ollama, signal } = opts;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, stream: true })
+      });
+      if (!res.ok) throw new HttpError(res.status, await res.text());
+      if (!res.body) return;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+
+          // Ollama envia JSON por linea: {"message":{"content":"..."}}
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t) continue;
+            try {
+              const json = JSON.parse(t);
+              const text = json.message?.content;
+              if (text) yield text;
+              if (json.done) return;
+            } catch { /* ignora lineas malformadas */ }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    }
+  };
+
+  /* ═════════════════════════════  HELPERS INTERNOS  ═════════════════════════════ */
+
+  /** Separa el system prompt de los mensajes (para Anthropic). */
+  function _splitSystem(messages) {
+    let system = '';
+    const userMessages = [];
+    for (const m of messages) {
+      if (m.role === 'system') {
+        system += (system ? '\n' : '') + m.content;
+      } else {
+        userMessages.push(m);
+      }
+    }
+    return { system, userMessages };
+  }
+
+  /** Convierte mensajes al formato de Google Gemini. */
+  function _toGoogleContents(messages) {
+    // Fusionar system en el primer mensaje de usuario
+    let systemText = '';
+    const contents = [];
+    for (const m of messages) {
+      if (m.role === 'system') {
+        systemText += m.content + '\n';
+        continue;
+      }
+      const role = m.role === 'user' ? 'user' : 'model';
+      contents.push({
+        role,
+        parts: [{ text: (role === 'user' && systemText ? systemText : '') + m.content }]
+      });
+      if (role === 'user') systemText = ''; // Solo inyectar system una vez
+    }
+    return contents;
+  }
+
+  /** Error HTTP con codigo de estado. */
+  class HttpError extends Error {
+    constructor(status, body = '') {
+      super(`HTTP ${status}`);
+      this.status = status;
+      this.body = body;
+    }
+  }
+
+  /** Obtiene el proveedor de implementacion segun el tipo. */
+  function _getImpl(providerRecord) {
+    if (!providerRecord) return null;
+    const name = (providerRecord.name || '').toLowerCase();
+    if (name.includes('openai')) return openaiProvider;
+    if (name.includes('anthropic') || name.includes('claude')) return anthropicProvider;
+    if (name.includes('google') || name.includes('gemini')) return googleProvider;
+    if (name.includes('ollama')) return ollamaProvider;
+    // Fallback: detectar por endpoint
+    const ep = (providerRecord.endpoint || '').toLowerCase();
+    if (ep.includes('openai.com')) return openaiProvider;
+    if (ep.includes('anthropic')) return anthropicProvider;
+    if (ep.includes('googleapis')) return googleProvider;
+    if (ep.includes('localhost:11434') || ep.includes('ollama')) return ollamaProvider;
+    // Default a OpenAI si no se puede detectar
+    return openaiProvider;
+  }
+
+  /** Resuelve la clave API para un proveedor (memoria > input DOM). */
+  function _getApiKey(providerId) {
+    // 1. Memoria en caliente
+    if (state.apiKeys.has(providerId)) {
+      return state.apiKeys.get(providerId);
+    }
+    // 2. Input del DOM (si esta visible)
+    if ($keyInput && $keyInput.value.trim()) {
+      const key = $keyInput.value.trim();
+      state.apiKeys.set(providerId, key);
+      return key;
+    }
+    return null;
+  }
+
+  /** Devuelve un mensaje de error amigable segun el tipo de fallo. */
+  function _friendlyError(err) {
+    if (err instanceof HttpError) {
+      if (err.status === 401) return 'La clave fue rechazada. Revisa que sea del proveedor correcto.';
+      if (err.status === 429) return 'Limite de peticiones alcanzado. Espera unos segundos.';
+      return `Error del servidor (${err.status}). Intenta de nuevo.`;
+    }
+    if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+      return 'El proveedor no respondio en 30 s.';
+    }
+    if (err.message && err.message.includes('fetch')) {
+      return 'Este proveedor bloquea llamadas desde el navegador. Usa el backend u Ollama en local.';
+    }
+    if (err.message && err.message.includes('CORS')) {
+      return 'Este proveedor bloquea llamadas desde el navegador. Usa el backend u Ollama en local.';
+    }
+    return 'Error de conexion. Revisa tu red y la configuracion del proveedor.';
+  }
+
+  /** Wrapper de fetch con timeout y AbortController. */
+  async function _fetchWithTimeout(url, options = {}) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { ...options, signal: ctrl.signal });
+      return res;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const te = new Error('timeout');
+        te.name = 'TimeoutError';
+        throw te;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /* ═════════════════════════════  SYSTEM PROMPT  ═════════════════════════════ */
+
+  /** Construye el system prompt con contexto de Miguel. */
+  function buildSystemPrompt() {
+    const phases = DB.getAll('phases');
+    const topics = DB.getAll('topics');
+
+    // Fase actual
+    const currentPhase = phases.find(p => p.status === 'in_progress') || phases[0];
+    const phaseName = currentPhase ? currentPhase.name : 'Desconocid
