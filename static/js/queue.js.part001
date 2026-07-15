@@ -1,0 +1,233 @@
+/**
+ * queue.js — F6: Cola de aprobación de recursos sugeridos por IA.
+ * Namespace: Queue
+ * Dependencias: DB (js/db.js), SVG icons (#i-extlink)
+ */
+const Queue = (() => {
+  'use strict';
+
+  /* ---------- Estado ---------- */
+  const state = {
+    selectedIds: new Set()
+  };
+
+  const CATEGORIES = ['youtube', 'blog', 'docs', 'curso', 'github', 'lab', 'ingles'];
+  const PHASES = ['0', '1', '2', '3', '4', '5', '6', '7'];
+
+  /* ---------- Utilidades ---------- */
+  const esc = (str) => {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+  };
+
+  const nowISO = () => new Date().toISOString();
+
+  const getCategoryLabel = (cat) => {
+    const labels = {
+      youtube: 'YouTube',
+      blog: 'Blog',
+      docs: 'Docs',
+      curso: 'Curso',
+      github: 'GitHub',
+      lab: 'Lab',
+      ingles: 'Inglés'
+    };
+    return labels[cat] || esc(cat);
+  };
+
+  const getCategoryTagClass = (cat) => {
+    const map = {
+      youtube: 'tag tag-green',
+      blog: 'tag tag-blue',
+      docs: 'tag tag-blue',
+      curso: 'tag tag-green',
+      github: 'tag',
+      lab: 'tag',
+      ingles: 'tag tag-blue'
+    };
+    return map[cat] || 'tag';
+  };
+
+  const getConfidenceBadge = (score) => {
+    if (score == null) return '<span class="tag">—</span>';
+    const n = Number(score);
+    if (Number.isNaN(n)) return '<span class="tag">—</span>';
+    if (n >= 0.8) return `<span class="tag tag-green">${Math.round(n * 100)}%</span>`;
+    if (n >= 0.5) return `<span class="tag tag-yellow">${Math.round(n * 100)}%</span>`;
+    return `<span class="tag">${Math.round(n * 100)}%</span>`;
+  };
+
+  /* ---------- Selección DOM ---------- */
+  let $container = null;
+  let $list = null;
+  let $bulkBar = null;
+
+  const ensureDOM = () => {
+    $container = document.getElementById('cola');
+    if (!$container) return false;
+    $list = $container.querySelector('.queue-list');
+    $bulkBar = $container.querySelector('.bulk-bar');
+    return true;
+  };
+
+  /* ==================== INIT ==================== */
+  const init = () => {
+    if (!ensureDOM()) return;
+    bindEvents();
+    render();
+  };
+
+  /* ---------- Eventos ---------- */
+  const bindEvents = () => {
+    if (!$list) return;
+
+    $list.addEventListener('click', (e) => {
+      /* Aprobar */
+      const btnApprove = e.target.closest('[data-action="approve"]');
+      if (btnApprove) {
+        const id = parseInt(btnApprove.dataset.id, 10);
+        if (!Number.isNaN(id)) approve(id);
+        return;
+      }
+
+      /* Rechazar */
+      const btnReject = e.target.closest('[data-action="reject"]');
+      if (btnReject) {
+        const id = parseInt(btnReject.dataset.id, 10);
+        if (!Number.isNaN(id)) reject(id);
+        return;
+      }
+
+      /* Editar y aprobar */
+      const btnEdit = e.target.closest('[data-action="edit-approve"]');
+      if (btnEdit) {
+        const id = parseInt(btnEdit.dataset.id, 10);
+        if (!Number.isNaN(id)) showEditModal(id);
+        return;
+      }
+
+      /* Checkbox individual */
+      const chk = e.target.closest('.queue-checkbox');
+      if (chk) {
+        const id = parseInt(chk.dataset.id, 10);
+        if (Number.isNaN(id)) return;
+        if (chk.checked) {
+          state.selectedIds.add(id);
+        } else {
+          state.selectedIds.delete(id);
+        }
+        renderBulkBar();
+      }
+    });
+
+    /* Barra de acciones en lote */
+    if ($bulkBar) {
+      $bulkBar.addEventListener('click', (e) => {
+        const btnApproveAll = e.target.closest('[data-action="bulk-approve"]');
+        if (btnApproveAll) {
+          bulkAction(Array.from(state.selectedIds), 'approve');
+          return;
+        }
+        const btnRejectAll = e.target.closest('[data-action="bulk-reject"]');
+        if (btnRejectAll) {
+          bulkAction(Array.from(state.selectedIds), 'reject');
+          return;
+        }
+        const btnClear = e.target.closest('[data-action="bulk-clear"]');
+        if (btnClear) {
+          state.selectedIds.clear();
+          render();
+        }
+      });
+    }
+  };
+
+  /* ==================== RENDER ==================== */
+  const render = () => {
+    renderBadge();
+    renderList();
+    renderBulkBar();
+  };
+
+  /* ---------- Badge en sidebar ---------- */
+  const renderBadge = () => {
+    const queue = DB.data.resource_queue || [];
+    const pendingCount = queue.filter(q => q.status === 'pending').length;
+
+    /* Buscar el item de sidebar "Cola" */
+    const $navItems = document.querySelectorAll('.nav-item');
+    $navItems.forEach($item => {
+      if ($item.textContent.toLowerCase().includes('cola')) {
+        let $badge = $item.querySelector('.nav-badge');
+        if (pendingCount > 0) {
+          if (!$badge) {
+            $badge = document.createElement('span');
+            $badge.className = 'nav-badge';
+            $item.appendChild($badge);
+          }
+          $badge.textContent = pendingCount;
+          $badge.style.display = '';
+        } else if ($badge) {
+          $badge.style.display = 'none';
+        }
+      }
+    });
+  };
+
+  /* ---------- Render lista ---------- */
+  const renderList = () => {
+    if (!$list) return;
+
+    const queue = DB.data.resource_queue || [];
+    const pending = queue.filter(q => q.status === 'pending');
+
+    /* Estado vacío */
+    if (pending.length === 0) {
+      $list.innerHTML = `
+        <div class="empty">
+          <div class="empty-ico">
+            <svg width="48" height="48"><use href="#i-recursos"/></svg>
+          </div>
+          <p>No hay recursos esperando revisión.</p>
+          <p class="empty-hint">La IA sugerirá recursos automáticamente según tu progreso.</p>
+        </div>
+      `;
+      return;
+    }
+
+    $list.innerHTML = pending.map(item => {
+      const title = esc(item.title || 'Sin título');
+      const url = esc(item.url || '');
+      const description = esc(item.description || '');
+      const category = esc(item.category || '');
+      const catLabel = getCategoryLabel(item.category);
+      const catTagClass = getCategoryTagClass(item.category);
+      const phaseLabel = item.phase != null ? `F${item.phase}` : '';
+      const phaseSuggested = item.phase_suggested != null ? `F${item.phase_suggested}` : phaseLabel;
+      const reason = esc(item.reason || '');
+      const confidence = getConfidenceBadge(item.confidence);
+      const model = esc(item.model || '');
+      const isChecked = state.selectedIds.has(item.id) ? ' checked' : '';
+
+      return `
+        <article class="queue-item" data-id="${item.id}">
+          <div class="queue-item-main">
+            <div class="queue-check">
+              <input type="checkbox" class="queue-checkbox" data-id="${item.id}"${isChecked}>
+            </div>
+            <div class="queue-content">
+              <div class="queue-header">
+                <h4 class="queue-title">
+                  <a href="${url}" target="_blank" rel="noopener noreferrer">
+                    ${title}
+                    <svg class="res-ext" width="14" height="14"><use href="#i-extlink"/></svg>
+                  </a>
+                </h4>
+                <div class="queue-meta-tags">
+                  <span class="${catTagClass}">${catLabel}</span>
+                  ${phaseSuggested ? `<span class="tag">Fase: ${phaseSuggested}</span>` : ''}
+                  ${confidence}
+                  ${model ? `<span class="tag tag-blue">${model}</span>` : ''}
+                </div>
