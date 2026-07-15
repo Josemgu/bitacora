@@ -1,0 +1,94 @@
+/**
+ * import-roadmap.js — ImportRoadmap module for Bitacora App
+ * Handles importing roadmaps from Markdown files and roadmap.sh
+ *
+ * Uses global namespace: DB, App
+ * CSS classes used: .view, .panel, .panel-head, .panel-body, .panel-note,
+ *                   .topic-list, .topic, .btn, .btn-primary, .btn-ghost, .btn-sm,
+ *                   .input, .select, .field, .tag, .tag-green, .mono, .kicker,
+ *                   .empty, .empty-ico, .empty-hint, .empty-sm
+ */
+const ImportRoadmap = (() => {
+  'use strict';
+
+  /* ── DOM refs ────────────────────────────────────────────── */
+  let $fileInput, $titleInput, $btnImportMD, $selectSH, $btnImportSH, $previewArea;
+
+  /* ── State ───────────────────────────────────────────────── */
+  const state = {
+    parsedStructure: null,
+    sourceType: null   // 'markdown' | 'roadmapsh'
+  };
+
+  /* ── Roadmap.sh pre-defined structures ───────────────────── */
+  const ROADMAPS_SH = {
+    'devops': {
+      title: 'DevOps Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Sistemas Operativos Linux', 'Shell Scripting (Bash)', 'Redes y Protocolos TCP/IP', 'HTTP/HTTPS y DNS', 'Git y Control de Versiones'] },
+        { name: 'CI/CD',            topics: ['Conceptos de Integracion Continua', 'Jenkins Pipelines', 'GitHub Actions', 'GitLab CI', 'Artefactos y Releases'] },
+        { name: 'Containers',       topics: ['Docker: Imagenes y Contenedores', 'Dockerfile Best Practices', 'Docker Networking', 'Docker Volumes y Storage', 'Docker Registry'] },
+        { name: 'Kubernetes',       topics: ['K8s Architecture (Pods, Services)', 'Deployments y ReplicaSets', 'ConfigMaps y Secrets', 'Ingress Controllers', 'Helm Charts'] },
+        { name: 'Monitoring',       topics: ['Prometheus y Grafana', 'Logging con ELK/EFK', 'Alertmanager', 'Distributed Tracing (Jaeger)', 'SLIs, SLOs, SLAs'] },
+        { name: 'Cloud & IaC',      topics: ['Terraform Basics', 'AWS Core Services (EC2, S3, VPC)', 'CloudFormation / ARM', 'Ansible para Config Management', 'Serverless (Lambda, Functions)'] }
+      ]
+    },
+    'docker': {
+      title: 'Docker Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Que es un contenedor vs VM', 'Instalacion de Docker', 'Docker Engine y Daemon', 'Docker CLI basics', 'Docker Hub y Registries'] },
+        { name: 'Dockerfile',       topics: ['Sintaxis de Dockerfile', 'Multi-stage builds', 'Layer caching optimization', '.dockerignore', 'Image scanning (Trivy)'] },
+        { name: 'Compose',          topics: ['docker-compose.yml syntax', 'Networking entre servicios', 'Volumes persistentes', 'Health checks', 'Override files'] },
+        { name: 'Swarm',            topics: ['Modo Swarm y nodos', 'Services y replicas', 'Overlay networks', 'Secrets y Configs', 'Stack deployments'] },
+        { name: 'K8s Integration',  topics: ['Container Runtime Interface', 'Pods con Docker images', 'Image Pull Policies', 'Private registries en K8s', 'Sidecar pattern'] },
+        { name: 'Produccion',       topics: ['Docker Bench Security', 'Resource limits (cgroups)', 'Log drivers', 'Runtime security (gVisor)', 'Image signing (Notary)'] }
+      ]
+    },
+    'frontend': {
+      title: 'Frontend Developer Roadmap',
+      phases: [
+        { name: 'HTML & CSS',       topics: ['Semantic HTML5', 'CSS Flexbox y Grid', 'Responsive Design', 'CSS Variables y Custom Properties', 'CSS Animations y Transitions'] },
+        { name: 'JavaScript',       topics: ['ES6+ Features', 'DOM Manipulation', 'Fetch API y Promises', 'Async/Await', 'Modules (ESM, CommonJS)'] },
+        { name: 'Frameworks',       topics: ['React: Components y JSX', 'Vue.js: Composition API', 'State Management (Redux/Pinia)', 'Routing (React Router)', 'SSR/SSG (Next, Nuxt)'] },
+        { name: 'Tooling',          topics: ['Vite y Webpack', 'ESLint y Prettier', 'TypeScript', 'Testing (Jest, Vitest)', 'Storybook para UI'] },
+        { name: 'Performance',      topics: ['Core Web Vitals', 'Lazy Loading', 'Code Splitting', 'Service Workers', 'PWA concepts'] },
+        { name: 'Accesibilidad',    topics: ['WCAG 2.1 Guidelines', 'ARIA attributes', 'Keyboard navigation', 'Screen readers', 'A11y testing tools'] }
+      ]
+    },
+    'backend': {
+      title: 'Backend Developer Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['HTTP/REST APIs', 'MVC Architecture', 'Authentication (JWT, OAuth2)', 'Database Design (ER)', 'Caching strategies'] },
+        { name: 'Lenguajes',        topics: ['Node.js con Express', 'Python con FastAPI/Django', 'Go con Gin/Fiber', 'Java con Spring Boot', 'Rust con Actix'] },
+        { name: 'Bases de Datos',   topics: ['PostgreSQL avanzado', 'MongoDB y document DBs', 'Redis para cache/sessions', 'ORMs (Prisma, SQLAlchemy)', 'Database migrations'] },
+        { name: 'API Design',       topics: ['RESTful best practices', 'GraphQL schemas y resolvers', 'API Versioning', 'Rate limiting', 'OpenAPI/Swagger docs'] },
+        { name: 'Mensajeria',       topics: ['Message Queues (RabbitMQ)', 'Event-driven con Kafka', 'Pub/Sub patterns', 'Background jobs (Celery)', 'Sagas y CQRS'] },
+        { name: 'Produccion',       topics: ['Docker containers', 'CI/CD pipelines', 'Load balancing', 'Observability (logs, metrics)', 'Horizontal scaling'] }
+      ]
+    },
+    'python': {
+      title: 'Python Developer Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Sintaxis y estructuras', 'List comprehensions', 'Decorators y closures', 'Manejo de excepciones', 'Context managers (with)'] },
+        { name: 'Estandar Library', topics: ['os, sys, pathlib', 'collections, itertools', 'json, csv, pickle', 'logging module', 'unittest y doctest'] },
+        { name: 'Web Development',  topics: ['FastAPI y async', 'Django ORM y Admin', 'Flask microframework', 'SQLAlchemy y Alembic', 'Templates (Jinja2)'] },
+        { name: 'Data Science',     topics: ['NumPy y Pandas', 'Matplotlib y Seaborn', 'Jupyter Notebooks', 'SciPy y estadistica', 'Data cleaning pipelines'] },
+        { name: 'ML & AI',          topics: ['scikit-learn workflows', 'Feature engineering', 'Model evaluation metrics', 'TensorFlow/Keras basics', 'MLOps con MLflow'] },
+        { name: 'Testing & Deploy', topics: ['pytest avanzado', 'Coverage y TDD', 'Docker para Python', 'Poetry y gestion de deps', 'Celery para tareas async'] }
+      ]
+    },
+    'cloud': {
+      title: 'Cloud Computing Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Modelos: IaaS, PaaS, SaaS', 'Virtualization vs Containers', 'Cloud Providers overview', 'Billing y cost management', 'Shared Responsibility Model'] },
+        { name: 'AWS Core',         topics: ['EC2, EBS, AMIs', 'S3, Glacier y Storage', 'VPC, subnets, security groups', 'IAM users, roles, policies', 'CloudWatch y CloudTrail'] },
+        { name: 'Azure Core',       topics: ['VMs, App Service', 'Azure Storage (Blob, Files)', 'VNet y NSGs', 'Azure AD y RBAC', 'Monitor y Log Analytics'] },
+        { name: 'GCP Core',         topics: ['Compute Engine', 'Cloud Storage y GCS', 'VPC networking', 'IAM y Service Accounts', 'Cloud Monitoring'] },
+        { name: 'Serverless',       topics: ['AWS Lambda y API Gateway', 'Azure Functions', 'Cloud Functions GCP', 'Event-driven architectures', 'Step Functions / Workflows'] },
+        { name: 'Cloud Native',     topics: ['Kubernetes en cloud (EKS/AKS/GKE)', 'Service Mesh (Istio)', 'Infrastructure as Code', 'Cost optimization', 'Multi-cloud strategies'] }
+      ]
+    },
+    'security': {
+      title: 'Cybersecurity Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['CIA Triad', 'Threats, Vulnerabilities, Risks', 'OSI Model para security', 'Linux para pentesting', 'Redes: TCP/IP, ports, firewalls'] },
