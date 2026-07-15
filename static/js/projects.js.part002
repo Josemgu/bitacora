@@ -1,0 +1,202 @@
+       var reqs = DB.query('project_requirements', function (r) {
+            return r.project_id === projectId;
+        });
+
+        var done = reqs.filter(function (r) { return r.done; }).length;
+        var total = reqs.length;
+
+        return {
+            done: done,
+            total: total,
+            percent: total ? Math.round((done / total) * 100) : 0
+        };
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       PANEL DE DETALLE
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Muestra un panel/panel con los detalles de un proyecto.
+     * Incluye lista de requisitos con checkboxes, progreso visual,
+     * y links a GitHub si existe repo_url.
+     *
+     * @param {number} projectId — ID del proyecto
+     */
+    function showProjectDetail(projectId) {
+        var project = DB.getById('projects', projectId);
+        if (!project) {
+            console.warn('[Projects] showProjectDetail: proyecto no encontrado:', projectId);
+            return;
+        }
+
+        // Buscar el panel de detalle inline
+        var detailPanel = document.querySelector('.project-detail[data-detail-for="' + projectId + '"]');
+        if (!detailPanel) {
+            console.warn('[Projects] showProjectDetail: panel de detalle no encontrado para proyecto', projectId);
+            return;
+        }
+
+        // Si ya esta visible, ocultarlo (toggle)
+        if (_activeDetailPanel === detailPanel && detailPanel.style.display !== 'none') {
+            detailPanel.style.display = 'none';
+            _activeDetailPanel = null;
+            return;
+        }
+
+        // Ocultar panel anterior si existe
+        if (_activeDetailPanel) {
+            _activeDetailPanel.style.display = 'none';
+        }
+
+        var progress = getProjectProgress(projectId);
+        var reqs = DB.query('project_requirements', function (r) {
+            return r.project_id === projectId;
+        });
+        reqs.sort(function (a, b) { return a.order - b.order; });
+
+        // Construir HTML del panel
+        var html = _buildDetailHTML(project, progress, reqs);
+        detailPanel.innerHTML = html;
+        detailPanel.style.display = 'block';
+
+        _activeDetailPanel = detailPanel;
+    }
+
+    /**
+     * Construye el HTML del panel de detalle.
+     * @param {Object} project — proyecto
+     * @param {Object} progress — progreso del proyecto
+     * @param {Array} reqs — requisitos del proyecto
+     * @returns {string} HTML
+     * @private
+     */
+    function _buildDetailHTML(project, progress, reqs) {
+        var statusLabel = _getStatusLabel(project.status);
+        var statusClass = _getStatusClass(project.status);
+
+        var html =
+            '<div class="project-detail-panel">\n' +
+            '  <div class="project-detail-head">\n' +
+            '    <div class="project-detail-title">\n' +
+            '      <svg class="ico"><use href="#i-github"></use></svg>\n' +
+            '      <strong>' + _esc(project.repo_name) + '</strong>\n' +
+            '      <span class="tag ' + statusClass + '">' + statusLabel + '</span>\n' +
+            '    </div>\n';
+
+        if (project.repo_url) {
+            html +=
+                '    <a href="' + _esc(project.repo_url) + '" target="_blank" class="btn btn-ghost btn-sm">\n' +
+                '      <svg class="ico"><use href="#i-externo"></use></svg> Abrir en GitHub\n' +
+                '    </a>\n';
+        }
+
+        html += '  </div>\n';
+
+        // Barra de progreso
+        html +=
+            '  <div class="project-detail-progress">\n' +
+            '    <div class="bar"><div class="bar-fill" style="width:' + progress.percent + '%"></div></div>\n' +
+            '    <span class="project-detail-pct">' + progress.percent + '% (' + progress.done + '/' + progress.total + ')</span>\n' +
+            '  </div>\n';
+
+        // Checklist de requisitos
+        if (reqs.length) {
+            html += '  <ul class="topic-list project-req-list">\n';
+            reqs.forEach(function (req) {
+                var reqClass = req.done ? 'done' : '';
+                var kindClass = 'kind-' + req.kind;
+                var kindColor = KIND_COLORS[req.kind] || KIND_COLORS.doc;
+                var checkIcon = req.done ?
+                    '<svg class="ico req-check" style="color:var(--green)"><use href="#i-github"></use></svg>' : '';
+
+                html +=
+                    '    <li class="topic ' + reqClass + ' ' + kindClass + ' project-req" ' +
+                    'data-req-id="' + req.id + '" title="' + _esc(KIND_LABELS[req.kind] || req.kind) + '">\n' +
+                    '      <span class="req-kind-dot" style="background:' + kindColor + '"></span>\n' +
+                    '      ' + _esc(req.requirement) + '\n' +
+                    '    </li>\n';
+            });
+            html += '  </ul>\n';
+        } else {
+            html +=
+                '  <div class="empty empty-sm">\n' +
+                '    <p>No hay requisitos definidos para este proyecto.</p>\n' +
+                '  </div>\n';
+        }
+
+        // Pie con leyenda de tipos
+        html +=
+            '  <div class="project-detail-legend">\n' +
+            '    <span><i class="dot" style="background:' + KIND_COLORS.doc + '"></i> Documento</span>\n' +
+            '    <span><i class="dot" style="background:' + KIND_COLORS.evidence + '"></i> Evidencia</span>\n' +
+            '    <span><i class="dot" style="background:' + KIND_COLORS.artifact + '"></i> Artefacto</span>\n' +
+            '  </div>\n';
+
+        html += '</div>';
+
+        return html;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       ACTUALIZACIONES INLINE DEL DOM
+       ═══════════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Actualiza un requisito en el DOM sin re-renderizar todo.
+     * @param {number} reqId — ID del requisito
+     * @param {boolean} isDone — nuevo estado
+     * @private
+     */
+    function _updateRequirementInline(reqId, isDone) {
+        var el = document.querySelector('.project-req[data-req-id="' + reqId + '"]');
+        if (!el) return;
+
+        if (isDone) {
+            el.classList.add('done');
+        } else {
+            el.classList.remove('done');
+        }
+    }
+
+    /**
+     * Actualiza el progreso visual de un proyecto en el DOM.
+     * @param {number} projectId — ID del proyecto
+     * @param {Object} progress — progreso actualizado
+     * @private
+     */
+    function _updateProjectProgressInline(projectId, progress) {
+        // Actualizar barra y texto en el listado principal
+        var item = document.querySelector('.project-item[data-project-id="' + projectId + '"]');
+        if (item) {
+            var barFill = item.querySelector('.bar-fill');
+            var countText = item.querySelector('.project-progress-bar em');
+
+            if (barFill) {
+                barFill.style.width = progress.percent + '%';
+            }
+            if (countText) {
+                countText.textContent = progress.done + '/' + progress.total;
+            }
+
+            // Actualizar clase de estado del proyecto
+            var project = DB.getById('projects', projectId);
+            if (project) {
+                var statusClass = _getStatusClass(project.status);
+                var statusLabel = _getStatusLabel(project.status);
+
+                // Actualizar clase del item
+                item.classList.remove('done', 'in_progress', 'pending');
+                if (statusClass) item.classList.add(statusClass);
+
+                // Actualizar tag de estado
+                var tag = item.querySelector('.project-name-row .tag');
+                if (tag) {
+                    tag.className = 'tag tag-sm ' + statusClass;
+                    tag.textContent = statusLabel;
+                }
+            }
+        }
+
+        // Actualizar panel de detalle si esta abierto
+        var detailPanel = document.querySelector('.project-detail[data-detail-for="
