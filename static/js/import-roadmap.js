@@ -1,161 +1,506 @@
+/**
+ * import-roadmap.js — ImportRoadmap module for Bitacora App
+ * Handles importing roadmaps from Markdown files and roadmap.sh
+ *
+ * Uses global namespace: DB, App
+ * CSS classes used: .view, .panel, .panel-head, .panel-body, .panel-note,
+ *                   .topic-list, .topic, .btn, .btn-primary, .btn-ghost, .btn-sm,
+ *                   .input, .select, .field, .tag, .tag-green, .mono, .kicker,
+ *                   .empty, .empty-ico, .empty-hint, .empty-sm
+ */
 const ImportRoadmap = (() => {
   'use strict';
 
+  /* ── DOM refs ────────────────────────────────────────────── */
+  let $fileInput, $titleInput, $btnImportMD, $selectSH, $btnImportSH, $previewArea;
+
+  /* ── State ───────────────────────────────────────────────── */
+  const state = {
+    parsedStructure: null,
+    sourceType: null   // 'markdown' | 'roadmapsh'
+  };
+
+  /* ── Roadmap.sh pre-defined structures ───────────────────── */
+  const ROADMAPS_SH = {
+    'devops': {
+      title: 'DevOps Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Sistemas Operativos Linux', 'Shell Scripting (Bash)', 'Redes y Protocolos TCP/IP', 'HTTP/HTTPS y DNS', 'Git y Control de Versiones'] },
+        { name: 'CI/CD',            topics: ['Conceptos de Integracion Continua', 'Jenkins Pipelines', 'GitHub Actions', 'GitLab CI', 'Artefactos y Releases'] },
+        { name: 'Containers',       topics: ['Docker: Imagenes y Contenedores', 'Dockerfile Best Practices', 'Docker Networking', 'Docker Volumes y Storage', 'Docker Registry'] },
+        { name: 'Kubernetes',       topics: ['K8s Architecture (Pods, Services)', 'Deployments y ReplicaSets', 'ConfigMaps y Secrets', 'Ingress Controllers', 'Helm Charts'] },
+        { name: 'Monitoring',       topics: ['Prometheus y Grafana', 'Logging con ELK/EFK', 'Alertmanager', 'Distributed Tracing (Jaeger)', 'SLIs, SLOs, SLAs'] },
+        { name: 'Cloud & IaC',      topics: ['Terraform Basics', 'AWS Core Services (EC2, S3, VPC)', 'CloudFormation / ARM', 'Ansible para Config Management', 'Serverless (Lambda, Functions)'] }
+      ]
+    },
+    'docker': {
+      title: 'Docker Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Que es un contenedor vs VM', 'Instalacion de Docker', 'Docker Engine y Daemon', 'Docker CLI basics', 'Docker Hub y Registries'] },
+        { name: 'Dockerfile',       topics: ['Sintaxis de Dockerfile', 'Multi-stage builds', 'Layer caching optimization', '.dockerignore', 'Image scanning (Trivy)'] },
+        { name: 'Compose',          topics: ['docker-compose.yml syntax', 'Networking entre servicios', 'Volumes persistentes', 'Health checks', 'Override files'] },
+        { name: 'Swarm',            topics: ['Modo Swarm y nodos', 'Services y replicas', 'Overlay networks', 'Secrets y Configs', 'Stack deployments'] },
+        { name: 'K8s Integration',  topics: ['Container Runtime Interface', 'Pods con Docker images', 'Image Pull Policies', 'Private registries en K8s', 'Sidecar pattern'] },
+        { name: 'Produccion',       topics: ['Docker Bench Security', 'Resource limits (cgroups)', 'Log drivers', 'Runtime security (gVisor)', 'Image signing (Notary)'] }
+      ]
+    },
+    'frontend': {
+      title: 'Frontend Developer Roadmap',
+      phases: [
+        { name: 'HTML & CSS',       topics: ['Semantic HTML5', 'CSS Flexbox y Grid', 'Responsive Design', 'CSS Variables y Custom Properties', 'CSS Animations y Transitions'] },
+        { name: 'JavaScript',       topics: ['ES6+ Features', 'DOM Manipulation', 'Fetch API y Promises', 'Async/Await', 'Modules (ESM, CommonJS)'] },
+        { name: 'Frameworks',       topics: ['React: Components y JSX', 'Vue.js: Composition API', 'State Management (Redux/Pinia)', 'Routing (React Router)', 'SSR/SSG (Next, Nuxt)'] },
+        { name: 'Tooling',          topics: ['Vite y Webpack', 'ESLint y Prettier', 'TypeScript', 'Testing (Jest, Vitest)', 'Storybook para UI'] },
+        { name: 'Performance',      topics: ['Core Web Vitals', 'Lazy Loading', 'Code Splitting', 'Service Workers', 'PWA concepts'] },
+        { name: 'Accesibilidad',    topics: ['WCAG 2.1 Guidelines', 'ARIA attributes', 'Keyboard navigation', 'Screen readers', 'A11y testing tools'] }
+      ]
+    },
+    'backend': {
+      title: 'Backend Developer Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['HTTP/REST APIs', 'MVC Architecture', 'Authentication (JWT, OAuth2)', 'Database Design (ER)', 'Caching strategies'] },
+        { name: 'Lenguajes',        topics: ['Node.js con Express', 'Python con FastAPI/Django', 'Go con Gin/Fiber', 'Java con Spring Boot', 'Rust con Actix'] },
+        { name: 'Bases de Datos',   topics: ['PostgreSQL avanzado', 'MongoDB y document DBs', 'Redis para cache/sessions', 'ORMs (Prisma, SQLAlchemy)', 'Database migrations'] },
+        { name: 'API Design',       topics: ['RESTful best practices', 'GraphQL schemas y resolvers', 'API Versioning', 'Rate limiting', 'OpenAPI/Swagger docs'] },
+        { name: 'Mensajeria',       topics: ['Message Queues (RabbitMQ)', 'Event-driven con Kafka', 'Pub/Sub patterns', 'Background jobs (Celery)', 'Sagas y CQRS'] },
+        { name: 'Produccion',       topics: ['Docker containers', 'CI/CD pipelines', 'Load balancing', 'Observability (logs, metrics)', 'Horizontal scaling'] }
+      ]
+    },
+    'python': {
+      title: 'Python Developer Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Sintaxis y estructuras', 'List comprehensions', 'Decorators y closures', 'Manejo de excepciones', 'Context managers (with)'] },
+        { name: 'Estandar Library', topics: ['os, sys, pathlib', 'collections, itertools', 'json, csv, pickle', 'logging module', 'unittest y doctest'] },
+        { name: 'Web Development',  topics: ['FastAPI y async', 'Django ORM y Admin', 'Flask microframework', 'SQLAlchemy y Alembic', 'Templates (Jinja2)'] },
+        { name: 'Data Science',     topics: ['NumPy y Pandas', 'Matplotlib y Seaborn', 'Jupyter Notebooks', 'SciPy y estadistica', 'Data cleaning pipelines'] },
+        { name: 'ML & AI',          topics: ['scikit-learn workflows', 'Feature engineering', 'Model evaluation metrics', 'TensorFlow/Keras basics', 'MLOps con MLflow'] },
+        { name: 'Testing & Deploy', topics: ['pytest avanzado', 'Coverage y TDD', 'Docker para Python', 'Poetry y gestion de deps', 'Celery para tareas async'] }
+      ]
+    },
+    'cloud': {
+      title: 'Cloud Computing Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Modelos: IaaS, PaaS, SaaS', 'Virtualization vs Containers', 'Cloud Providers overview', 'Billing y cost management', 'Shared Responsibility Model'] },
+        { name: 'AWS Core',         topics: ['EC2, EBS, AMIs', 'S3, Glacier y Storage', 'VPC, subnets, security groups', 'IAM users, roles, policies', 'CloudWatch y CloudTrail'] },
+        { name: 'Azure Core',       topics: ['VMs, App Service', 'Azure Storage (Blob, Files)', 'VNet y NSGs', 'Azure AD y RBAC', 'Monitor y Log Analytics'] },
+        { name: 'GCP Core',         topics: ['Compute Engine', 'Cloud Storage y GCS', 'VPC networking', 'IAM y Service Accounts', 'Cloud Monitoring'] },
+        { name: 'Serverless',       topics: ['AWS Lambda y API Gateway', 'Azure Functions', 'Cloud Functions GCP', 'Event-driven architectures', 'Step Functions / Workflows'] },
+        { name: 'Cloud Native',     topics: ['Kubernetes en cloud (EKS/AKS/GKE)', 'Service Mesh (Istio)', 'Infrastructure as Code', 'Cost optimization', 'Multi-cloud strategies'] }
+      ]
+    },
+    'security': {
+      title: 'Cybersecurity Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['CIA Triad', 'Threats, Vulnerabilities, Risks', 'OSI Model para security', 'Linux para pentesting', 'Redes: TCP/IP, ports, firewalls'] },     { name: 'Offensive',        topics: ['Reconnaissance (OSINT)', 'Scanning: Nmap, Masscan', 'Exploitation: Metasploit', 'Web attacks: OWASP Top 10', 'Privilege escalation'] },
+        { name: 'Defensive',        topics: ['IDS/IPS (Snort, Suricata)', 'SIEM (Splunk, Wazuh)', 'Endpoint protection (EDR)', 'Hardening OS y servicios', 'Incident response process'] },
+        { name: 'AppSec',           topics: ['Secure coding practices', 'SAST/DAST tools', 'Dependency scanning (SCA)', 'API security testing', 'Bug bounty methodology'] },
+        { name: 'Cloud Security',   topics: ['Cloud IAM hardening', 'Container security', 'CSPM tools', 'Zero Trust architecture', 'DevSecOps practices'] },
+        { name: 'Certificaciones',  topics: ['CompTIA Security+', 'eJPT / eCPPT', 'OSCP preparation', 'CISSP domains overview', 'Practical CTFs y labs'] }
+      ]
+    },
+    'system-design': {
+      title: 'System Design Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Horizontal vs Vertical scaling', 'Load balancing algorithms', 'Caching strategies (CDN, Redis)', 'Database scaling (sharding)', 'CAP Theorem'] },
+        { name: 'Microservices',    topics: ['Service boundaries y DDD', 'Inter-service communication', 'API Gateway pattern', 'Service Discovery', 'Circuit breaker pattern'] },
+        { name: 'Data Layer',       topics: ['SQL vs NoSQL decision', 'Database indexing strategies', 'Read replicas', 'Event sourcing', 'CQRS pattern'] },
+        { name: 'Messaging',        topics: ['Message queues architecture', 'Event-driven design', 'Idempotency y exactly-once', 'SAGA pattern', 'Outbox pattern'] },
+        { name: 'Reliability',      topics: ['Rate limiting strategies', 'Retry con backoff', 'Graceful degradation', 'Chaos engineering', 'Disaster recovery'] },
+        { name: 'Case Studies',     topics: ['Design URL shortener', 'Design Twitter/X feed', 'Design WhatsApp', 'Design Netflix', 'Design Uber'] }
+      ]
+    },
+    'ai-ml': {
+      title: 'AI / Machine Learning Roadmap',
+      phases: [
+        { name: 'Matematicas',      topics: ['Calculo diferencial e integral', 'Algebra lineal (matrices, vectores)', 'Probabilidad y estadistica', 'Optimizacion (gradient descent)', 'Information theory'] },
+        { name: 'Python & Tools',   topics: ['NumPy y vectorizacion', 'Pandas y data manipulation', 'Matplotlib/Seaborn viz', 'Jupyter workflows', 'Colab y GPU training'] },
+        { name: 'ML Clasico',       topics: ['Regression (linear, logistic)', 'Decision Trees y Random Forest', 'SVM y Kernels', 'Clustering (K-means, DBSCAN)', 'Cross-validation y tuning'] },
+        { name: 'Deep Learning',    topics: ['Neural Networks basics', 'Backpropagation', 'CNN para vision', 'RNN/LSTM para secuencias', 'Transformers (attention)'] },
+        { name: 'Frameworks',       topics: ['TensorFlow 2.x', 'PyTorch workflows', 'Keras functional API', 'Hugging Face ecosystem', 'ONNX para deployment'] },
+        { name: 'MLOps',            topics: ['MLflow experiment tracking', 'Model versioning (DVC)', 'Feature stores', 'Model serving (TF Serving)', 'Monitoring de modelos'] }
+      ]
+    },
+    'react': {
+      title: 'React Developer Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['JSX y Virtual DOM', 'Componentes funcionales', 'Props y State', 'Event handling', 'Conditional rendering'] },
+        { name: 'Hooks',            topics: ['useState y useEffect', 'useContext para estado global', 'useReducer para logica compleja', 'useMemo y useCallback', 'Custom hooks'] },
+        { name: 'State Management', topics: ['Redux Toolkit (RTK)', 'Zustand', 'React Query / TanStack Query', 'Form libraries (React Hook Form)', 'URL state management'] },
+        { name: 'Routing',          topics: ['React Router v6', 'Nested routes', 'Route guards', 'Lazy loading routes', 'Data routers'] },
+        { name: 'Testing',          topics: ['Testing Library (RTL)', 'Jest configuration', 'Mocking services', 'E2E con Playwright/Cypress', 'Visual regression testing'] },
+        { name: 'Produccion',       topics: ['Next.js App Router', 'SSR, SSG, ISR', 'Server Components', 'Vercel deployment', 'Performance optimization'] }
+      ]
+    }
+  };
+
+  /* ── Init ────────────────────────────────────────────────── */
   function init() {
-    bindEvents();
+    $fileInput    = document.getElementById('import-md-file');
+    $titleInput   = document.getElementById('import-md-title');
+    $btnImportMD  = document.getElementById('btn-import-md');
+    $selectSH     = document.getElementById('import-roadmapsh-select');
+    $btnImportSH  = document.getElementById('btn-import-sh');
+    $previewArea  = document.getElementById('import-preview-area');
+
+    if (!$fileInput || !$previewArea) return;
+
+    /* Bind markdown import events */
+    $fileInput.addEventListener('change', handleFileSelect);
+    if ($btnImportMD) {
+      $btnImportMD.addEventListener('click', () => {
+        $fileInput.click();
+      });
+    }
+
+    /* Bind roadmap.sh import events */
+    if ($btnImportSH) {
+      $btnImportSH.addEventListener('click', importFromRoadmapSH);
+    }
+
+    /* Clear preview initially */
+    renderEmpty();
   }
 
-  function bindEvents() {
-    document.getElementById('btn-import-md')?.addEventListener('click', handleImportMD);
-    document.getElementById('btn-import-sh')?.addEventListener('click', handleImportSH);
-    document.getElementById('import-md-file')?.addEventListener('change', handleFileSelect);
+  /* ── Empty state ─────────────────────────────────────────── */
+  function renderEmpty() {
+    $previewArea.innerHTML = `
+      <div class="empty empty-sm">
+        <div class="empty-ico">recursos</div>
+        <div class="empty-hint">Selecciona un archivo .md o elige un roadmap de roadmap.sh para ver el preview</div>
+      </div>
+    `;
+    state.parsedStructure = null;
+    state.sourceType = null;
   }
 
-  function handleFileSelect(e) {
-    const file = e.target.files[0];
+  /* ════════════════════════════════════════════════════════════
+     IMPORT FROM MARKDOWN
+     ════════════════════════════════════════════════════════════ */
+
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
     if (!file) return;
+
+    if (!file.name.endsWith('.md')) {
+      showError('Por favor selecciona un archivo .md (Markdown)');
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target.result;
-      const structure = parseMarkdown(text);
-      document.getElementById('import-md-title').value = structure.title || '';
-      renderPreview(structure);
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const structure = parseMarkdown(text);
+        if ($titleInput && structure.title) {
+          $titleInput.value = structure.title;
+        }
+        state.parsedStructure = structure;
+        state.sourceType = 'markdown';
+        renderPreview(structure);
+      } catch (err) {
+        showError('Error al parsear el markdown: ' + err.message);
+      }
+    };
+    reader.onerror = () => {
+      showError('Error al leer el archivo');
     };
     reader.readAsText(file);
   }
 
-  function handleImportMD() {
-    const fileInput = document.getElementById('import-md-file');
-    const title = document.getElementById('import-md-title').value.trim();
-    if (!fileInput.files[0]) {
-      alert('Selecciona un archivo .md');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const structure = parseMarkdown(ev.target.result);
-      if (title) structure.title = title;
-      importStructure(structure);
-    };
-    reader.readAsText(fileInput.files[0]);
-  }
-
-  function handleImportSH() {
-    const select = document.getElementById('import-roadmapsh-select');
-    const slug = select.value;
-    if (!slug) {
-      alert('Selecciona un roadmap de roadmap.sh');
-      return;
-    }
-    const structure = getRoadmapSHStructure(slug);
-    renderPreview(structure);
-    if (confirm('Importar "' + structure.title + '"?')) {
-      importStructure(structure);
-    }
-  }
-
+  /* Parse markdown text into structured roadmap */
   function parseMarkdown(text) {
-    const lines = text.split('\n');
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
     let title = 'Roadmap Importado';
     const phases = [];
     let currentPhase = null;
-    let currentTopics = [];
-    lines.forEach(line => {
-      const h1 = line.match(/^#\s+(.+)/);
-      const h2 = line.match(/^##\s+(.+)/);
-      const h3 = line.match(/^###\s+(.+)/);
-      if (h1) {
-        title = h1[1].trim();
-      } else if (h2) {
-        if (currentPhase) {
-          currentPhase.topics = currentTopics;
-          phases.push(currentPhase);
-        }
-        currentPhase = { title: h2[1].trim(), topics: [] };
-        currentTopics = [];
-      } else if (h3 && currentPhase) {
-        currentTopics.push({ title: h3[1].trim(), status: 'todo' });
+
+    for (const line of lines) {
+      const h1Match = line.match(/^#\s+(.+)$/);
+      const h2Match = line.match(/^##\s+(.+)$/);
+      const h3Match = line.match(/^###\s+(.+)$/);
+
+      if (h1Match) {
+        title = h1Match[1].trim();
+        continue;
       }
-    });
-    if (currentPhase) {
-      currentPhase.topics = currentTopics;
-      phases.push(currentPhase);
+
+      if (h2Match) {
+        currentPhase = {
+          name: h2Match[1].trim(),
+          topics: []
+        };
+        phases.push(currentPhase);
+        continue;
+      }
+
+      if (h3Match && currentPhase) {
+        currentPhase.topics.push(h3Match[1].trim());
+      }
     }
-    return { title, phases: phases.map((p, i) => ({
-      index: i,
-      title: p.title,
-      description: p.title,
-      accent: ['#3fb950', '#58a6ff', '#a371f7', '#d29922', '#f85149', '#39c5cf', '#8b949e'][i % 7],
-      topics: p.topics
-    }))};
+
+    /* If no H2 found but H3 exist, group them into a generic phase */
+    if (phases.length === 0) {
+      const h3Topics = [];
+      for (const line of lines) {
+        const h3Match = line.match(/^###\s+(.+)$/);
+         if (h3Match) h3Topics.push(h3Match[1].trim());
+      }
+      if (h3Topics.length > 0) {
+        phases.push({ name: 'General', topics: h3Topics });
+      }
+    }
+
+    if (phases.length === 0) {
+      throw new Error('No se encontraron fases (##) ni temas (###) en el archivo');
+    }
+
+    return { title, phases };
   }
 
-  function getRoadmapSHStructure(slug) {
-    const templates = {
-      devops: { title: 'DevOps', phases: ['Fundamentos', 'CI/CD', 'Containers', 'Kubernetes', 'Monitoring', 'Cloud'] },
-      docker: { title: 'Docker', phases: ['Fundamentos', 'Dockerfile', 'Compose', 'Swarm', 'K8s Integration'] },
-      kubernetes: { title: 'Kubernetes', phases: ['Fundamentos', 'Pods', 'Services', 'Deployments', 'Helm', 'Advanced'] },
-      aws: { title: 'AWS', phases: ['IAM', 'EC2', 'S3', 'RDS', 'VPC', 'Lambda', 'CloudFormation'] },
-      python: { title: 'Python', phases: ['Basics', 'OOP', 'Libraries', 'Web', 'Data', 'Advanced'] },
-      'cyber-security': { title: 'Cyber Security', phases: ['Networking', 'Linux', 'Offensive', 'Defensive', 'Cloud Sec', 'Compliance'] },
-      golang: { title: 'Go', phases: ['Basics', 'Concurrency', 'Web', 'Testing', 'Advanced'] },
-      java: { title: 'Java', phases: ['Basics', 'OOP', 'Collections', 'Spring', 'Advanced'] },
-      frontend: { title: 'Frontend', phases: ['HTML/CSS', 'JavaScript', 'React', 'State', 'Advanced'] },
-      backend: { title: 'Backend', phases: ['APIs', 'Databases', 'Auth', 'Caching', 'Microservices'] },
-    };
-    const tmpl = templates[slug] || templates.devops;
-    return {
-      title: 'Roadmap.sh: ' + tmpl.title,
-      phases: tmpl.phases.map((p, i) => ({
-        index: i,
-        title: p,
-        description: p,
-        accent: ['#3fb950', '#58a6ff', '#a371f7', '#d29922', '#f85149', '#39c5cf', '#8b949e'][i % 7],
-        topics: [
-          { title: 'Conceptos fundamentales', status: 'todo' },
-          { title: 'Practica hands-on', status: 'todo' },
-          { title: 'Proyecto practico', status: 'todo' }
-        ]
-      }))
-    };
-  }
-
+  /* Render preview of parsed markdown structure */
   function renderPreview(structure) {
-    const area = document.getElementById('import-preview-area');
     const totalTopics = structure.phases.reduce((sum, p) => sum + p.topics.length, 0);
-    area.innerHTML = `
-      <div style="margin-bottom:12px">
-        <h4 style="font-size:16px;margin-bottom:4px">${structure.title}</h4>
-        <p style="font-size:12px;color:var(--muted)">${structure.phases.length} fases · ${totalTopics} temas</p>
+
+    let phasesHTML = '';
+    for (const phase of structure.phases) {
+      const topicsHTML = phase.topics.map(t =>
+        `<div class="topic"><span class="mono">&#9656;</span> ${escapeHtml(t)}</div>`
+      ).join('');
+      phasesHTML += `
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:600;margin-bottom:4px;color:var(--accent);">${escapeHtml(phase.name)}</div>
+          <div class="topic-list">
+            ${topicsHTML}
+          </div>
+        </div>
+      `;
+    }
+
+    $previewArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-head">
+          <span class="kicker">Preview</span>
+          <span class="tag tag-green">${structure.phases.length} fases / ${totalTopics} temas</span>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:var(--font-lg);font-weight:700;margin-bottom:12px;">${escapeHtml(structure.title)}</div>
+          ${phasesHTML}
+        </div>
+        <div class="panel-note" style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm btn-block" id="btn-confirm-import-md">
+            <span class="mono">&#10003;</span> Confirmar importacion
+          </button>
+          <button class="btn btn-ghost btn-sm" id="btn-cancel-import-md">
+            Cancelar
+          </button>
+        </div>
       </div>
-      <ul class="topic-list" style="margin-top:0">
-        ${structure.phases.map(p => `
-          <li class="topic"><strong>${p.title}</strong> (${p.topics.length} temas)</li>
-        `).join('')}
-      </ul>
+    `;
+
+    document.getElementById('btn-confirm-import-md').addEventListener('click', () => {
+      confirmImport(structure);
+    });
+    document.getElementById('btn-cancel-import-md').addEventListener('click', () => {
+      renderEmpty();
+      if ($fileInput) $fileInput.value = '';
+      if ($titleInput) $titleInput.value = '';
+    });
+  }
+
+  /* Save markdown-imported roadmap to DB */
+  function confirmImport(structure) {
+    try {
+      const roadmapId = saveStructureToDB(structure);
+      App.navigate('roadmap/' + roadmapId);
+      showSuccess('Roadmap importado correctamente desde Markdown');
+    } catch (err) {
+      showError('Error al guardar: ' + err.message);
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     IMPORT FROM ROADMAP.SH
+     ════════════════════════════════════════════════════════════ */
+
+  function importFromRoadmapSH() {
+    if (!$selectSH) return;
+    const slug = $selectSH.value;
+    if (!slug) {
+      showError('Selecciona un roadmap de la lista');
+      return;
+    }
+
+    const structure = getRoadmapSHStructure(slug);
+    state.parsedStructure = structure;
+    state.sourceType = 'roadmapsh';
+    renderPreviewFromSH(structure);
+  }
+
+  /* Return a pre-defined structure based on slug */
+  function getRoadmapSHStructure(slug) {
+    if (ROADMAPS_SH[slug]) {
+      /* Deep clone to avoid mutations */
+      return JSON.parse(JSON.stringify(ROADMAPS_SH[slug]));
+    }
+
+    /* Fallback generic structure */
+    return {
+      title: slug.charAt(0).toUpperCase() + slug.slice(1) + ' Roadmap',
+      phases: [
+        { name: 'Fundamentos',      topics: ['Conceptos basicos', 'Herramientas esenciales', 'Configuracion del entorno', 'Primeros pasos practicos'] },
+        { name: 'Intermedio',       topics: ['Patrones comunes', 'Integraciones', 'Testing basico', 'Mejores practicas'] },
+        { name: 'Avanzado',         topics: ['Arquitectura avanzada', 'Optimizacion', 'Seguridad', 'Escalabilidad'] },
+        { name: 'Especializacion',  topics: ['Casos de uso especificos', 'Herramientas especializadas', 'Comunidad y recursos', 'Proyectos practicos'] }
+      ]
+    };
+  }
+
+  /* Render preview for roadmap.sh import */
+  function renderPreviewFromSH(structure) {
+    const totalTopics = structure.phases.reduce((sum, p) => sum + p.topics.length, 0);
+
+    let phasesHTML = '';
+    for (const phase of structure.phases) {
+      const topicsHTML = phase.topics.map(t =>
+        `<div class="topic"><span class="mono">&#9656;</span> ${escapeHtml(t)}</div>`
+      ).join('');
+      phasesHTML += `
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:600;margin-bottom:4px;color:var(--accent);">${escapeHtml(phase.name)}</div>
+          <div class="topic-list">
+            ${topicsHTML}
+          </div>
+        </div>
+      `;
+    }
+
+    $previewArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-head">
+          <span class="kicker">roadmap.sh</span>
+          <span class="tag tag-green">${structure.phases.length} fases / ${totalTopics} temas</span>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:var(--font-lg);font-weight:700;margin-bottom:12px;">
+            ${escapeHtml(structure.title)}
+            <span class="mono" style="font-size:var(--font-sm);color:var(--text-dim);margin-left:8px;">(fuente: roadmap.sh)</span>
+          </div>
+          ${phasesHTML}
+        </div>
+        <div class="panel-note" style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm btn-block" id="btn-confirm-import-sh">
+            <span class="mono">&#10003;</span> Confirmar importacion
+          </button>
+          <button class="btn btn-ghost btn-sm" id="btn-cancel-import-sh">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-confirm-import-sh').addEventListener('click', () => {
+      confirmImportSH(structure);
+    });
+    document.getElementById('btn-cancel-import-sh').addEventListener('click', () => {
+      renderEmpty();
+    });
+  }
+
+  /* Save roadmap.sh structure to DB */
+  function confirmImportSH(structure) {
+    try {
+      const roadmapId = saveStructureToDB(structure);
+      App.navigate('roadmap/' + roadmapId);
+      showSuccess('Roadmap importado correctamente desde roadmap.sh');
+    } catch (err) {
+      showError('Error al guardar: ' + err.message);
+    }
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     SHARED DB HELPERS
+     ════════════════════════════════════════════════════════════ */
+
+  function saveStructureToDB(structure) {
+    /* Create roadmap entry */
+    const roadmapId = DB.insert('roadmaps', {
+      title: structure.title,
+      created: Date.now(),
+      updated: Date.now(),
+      source: state.sourceType || 'imported'
+    });
+
+    /* Create phases and topics */
+    let phaseOrder = 0;
+    for (const phase of structure.phases) {
+      const phaseId = DB.insert('phases', {
+        roadmap_id: roadmapId,
+        name: phase.name,
+        order: phaseOrder++,
+        created: Date.now()
+      });
+
+      let topicOrder = 0;
+      for (const topicName of phase.topics) {
+        DB.insert('topics', {
+          phase_id: phaseId,
+          roadmap_id: roadmapId,
+          name: topicName,
+          order: topicOrder++,
+          status: 'pending',
+          notes: '',
+          resources: '',
+          created: Date.now()
+        });
+      }
+    }
+
+    if (typeof App.updateProgress === 'function') {
+      App.updateProgress();
+    }
+
+    return roadmapId;
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     UTILS
+     ════════════════════════════════════════════════════════════ */
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function showError(msg) {
+    $previewArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-body">
+          <div style="color:var(--error);font-weight:600;">
+            <span class="mono">&#9888;</span> ${escapeHtml(msg)}
+          </div>
+        </div>
+      </div>
     `;
   }
 
-  function importStructure(structure) {
-    structure.phases.forEach((p, i) => {
-      const phase = DB.insert('phases', {
-        index: p.index,
-        title: p.title,
-        description: p.description,
-        accent: p.accent,
-        status: 'todo'
-      });
-      p.topics.forEach(t => {
-        DB.insert('topics', {
-          phase_id: phase.id,
-          title: t.title,
-          order: t.order || 0,
-          status: 'todo'
-        });
-      });
-    });
-    App.navigate('roadmap');
+  function showSuccess(msg) {
+    $previewArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-body">
+          <div style="color:var(--success);font-weight:600;">
+            <span class="mono">&#10003;</span> ${escapeHtml(msg)}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
-  return { init };
+  /* ── Public API ──────────────────────────────────────────── */
+  return {
+    init,
+    parseMarkdown,
+    getRoadmapSHStructure
+  };
 })();

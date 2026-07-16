@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bitácora — Cloud Security Engineer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=2">
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<symbol id="i-isotipo" viewBox="100 330 370 370"><path fill="currentColor" opacity="1.000000" stroke="none" d=" M310.793884,684.054321 C281.833008,693.313782 257.006378,687.298340 235.864227,665.881775 C201.334534,630.903870 166.649063,596.079651 132.160995,561.060913 C106.260162,534.761597 106.226822,489.605347 132.073486,463.258636 C163.572052,431.150696 195.255585,399.224304 226.805328,367.166443 C233.814728,360.044128 240.528275,352.628296 248.784424,346.859924 C273.072693,329.890198 311.342133,331.340851 334.278259,354.667389 C362.310822,383.177063 390.466431,411.565765 418.545135,440.030121 C425.680939,447.263977 432.730591,454.582886 439.813599,461.868805 C467.352692,490.196747 467.705811,534.077087 440.044373,562.257690 C405.263672,597.691101 370.016296,632.666077 335.078430,667.945923 C328.145966,674.946228 320.228699,680.232849 310.793884,684.054321 M236.552277,426.319275 C234.719589,426.317963 232.886887,426.311249 231.054214,426.316284 C223.530518,426.336823 223.277420,426.567810 223.269974,434.281555 C223.255844,448.944763 223.129929,463.610474 223.374619,478.269714 C223.448257,482.681519 222.275894,485.038910 217.916168,486.881622 C201.659607,493.752838 185.621582,501.142639 169.531616,508.404419 C167.641251,509.257568 165.395660,509.713928 164.230881,511.817535 C165.189697,513.448303 166.891846,513.893677 168.346405,514.545776 C184.911133,521.971802 201.468124,529.418152 218.126312,536.630188 C221.817596,538.228271 223.466721,540.172363 223.391403,544.425293 C223.125824,559.417114 223.277756,574.416443 223.288727,589.412964 C223.294312,597.049255 223.355743,597.080872 231.207001,597.070862 C242.371002,597.056641 253.536713,597.169739 264.698059,596.994873 C268.235931,596.939392 270.184570,598.161621 271.411652,601.513062 C273.871613,608.231689 276.525360,614.890076 279.388428,621.447021 C281.614502,626.545166 283.184418,631.978577 286.322876,636.906982 C288.237335,635.020935 288.944794,632.957825 289.769073,630.990051 C293.500885,622.081421 297.512177,613.269714 300.759705,604.186035 C302.684326,598.802612 305.459198,596.658569 311.310364,596.913391 C322.279327,597.390991 332.965759,595.233459 342.688232,590.027405 C356.907776,582.413269 364.411285,570.447388 364.802673,554.096924 C365.240234,535.819641 358.154816,521.826111 342.052490,512.689331 C340.261383,511.673096 337.910645,511.325287 337.036224,509.102997 C337.571594,507.320709 339.163422,506.891266 340.338928,506.055359 C362.808472,490.076447 364.267700,454.462982 343.026550,436.856384 C333.447632,428.916595 321.798462,426.675049 309.826111,426.482758 C304.880127,426.403351 302.420105,424.936554 300.698242,420.301056 C297.454773,411.569305 293.562225,403.077911 289.905548,394.501099 C289.205597,392.859344 288.807068,390.627563 286.606476,390.540894 C284.247650,390.447906 284.026917,392.844910 283.348511,394.429474 C279.351837,403.764923 275.342316,413.097595 271.563141,422.521820 C270.373749,425.487854 268.643677,426.446808 265.529388,426.386719 C256.201691,426.206787 246.868332,426.320129 236.552277,426.319275 M369.356293,502.819183 C369.130585,510.114594 370.935455,516.905945 374.270721,523.367310 C375.651001,526.041321 377.186462,526.905029 380.190399,525.514343 C388.315613,521.752747 396.584229,518.301880 404.766571,514.661621 C406.203705,514.022278 407.995026,513.599670 408.313171,510.818237 C396.564972,504.610321 383.978577,499.820129 371.706482,494.237885 C369.940308,497.052551 369.927460,499.581390 369.356293,502.819183 z"/> <path fill="currentColor" opacity="1.000000" stroke="none" d=" M292.999725,524.643677 C301.396240,525.148926 309.442596,523.405396 317.154236,526.711426 C324.949951,530.053528 329.863739,537.308655 329.967194,546.336487 C330.069366,555.252930 325.228516,562.721130 317.201477,565.900818 C313.469116,567.379333 309.616608,568.264465 305.547821,568.253662 C291.413544,568.216187 277.277710,568.162354 263.145386,568.341736 C259.149200,568.392395 257.502472,567.259277 257.600983,562.976746 C257.857086,551.841125 257.799866,540.694763 257.651093,529.555542 C257.602356,525.904419 258.892670,524.535828 262.568848,524.593750 C272.543640,524.750916 282.522552,524.644470 292.999725,524.643677 z"/> <path fill="currentColor" opacity="1.000000" stroke="none" d=" M319.391876,489.306122 C314.976624,494.202240 309.560516,496.184448 303.558014,496.270874 C289.753540,496.469604 275.944641,496.342865 262.138763,496.475525 C259.001068,496.505676 257.620758,495.486420 257.660004,492.180145 C257.786438,481.535156 257.776611,470.887238 257.682098,460.241669 C257.652649,456.926758 259.229950,455.883789 262.263458,455.895081 C275.737427,455.945190 289.221130,455.615662 302.682220,456.036072 C310.743469,456.287872 318.329529,458.677704 322.029938,466.923584 C325.492310,474.638947 324.768799,482.129517 319.391876,489.306122 z"/></symbol>
+<symbol id="i-inicio" viewBox="0 0 512 512"><g> <path d="M256,319.841c-35.346,0-64,28.654-64,64v128h128v-128C320,348.495,291.346,319.841,256,319.841z"/> <g> <path d="M362.667,383.841v128H448c35.346,0,64-28.654,64-64V253.26c0.005-11.083-4.302-21.733-12.011-29.696l-181.29-195.99 c-31.988-34.61-85.976-36.735-120.586-4.747c-1.644,1.52-3.228,3.103-4.747,4.747L12.395,223.5 C4.453,231.496-0.003,242.31,0,253.58v194.261c0,35.346,28.654,64,64,64h85.333v-128c0.399-58.172,47.366-105.676,104.073-107.044 C312.01,275.383,362.22,323.696,362.667,383.841z"/> <path d="M256,319.841c-35.346,0-64,28.654-64,64v128h128v-128C320,348.495,291.346,319.841,256,319.841z"/> </g> </g></symbol>
+<symbol id="i-roadmap" viewBox="0 0 24 24"><path d="M12,0A12,12,0,1,0,24,12,12.013,12.013,0,0,0,12,0ZM22,12a9.938,9.938,0,0,1-1.662,5.508l-1.192-1.193A.5.5,0,0,1,19,15.962V15a3,3,0,0,0-3-3H13a1,1,0,0,1-1-1v-.5a.5.5,0,0,1,.5-.5A2.5,2.5,0,0,0,15,7.5v-1a.5.5,0,0,1,.5-.5h1.379a2.516,2.516,0,0,0,1.767-.732l.377-.377A9.969,9.969,0,0,1,22,12Zm-19.951.963,3.158,3.158A2.978,2.978,0,0,0,7.329,17H10a1,1,0,0,1,1,1v3.949A10.016,10.016,0,0,1,2.049,12.963ZM13,21.949V18a3,3,0,0,0-3-3H7.329a1,1,0,0,1-.708-.293L2.163,10.249A9.978,9.978,0,0,1,17.456,3.63l-.224.224A.507.507,0,0,1,16.879,4H15.5A2.5,2.5,0,0,0,13,6.5v1a.5.5,0,0,1-.5.5A2.5,2.5,0,0,0,10,10.5V11a3,3,0,0,0,3,3h3a1,1,0,0,1,1,1v.962a2.516,2.516,0,0,0,.732,1.767l1.337,1.337A9.971,9.971,0,0,1,13,21.949Z"/></symbol>
+<symbol id="i-calendario" viewBox="0 0 24 24"><path d="M19,2H18V1a1,1,0,0,0-2,0V2H8V1A1,1,0,0,0,6,1V2H5A5.006,5.006,0,0,0,0,7V19a5.006,5.006,0,0,0,5,5H19a5.006,5.006,0,0,0,5-5V7A5.006,5.006,0,0,0,19,2ZM2,7A3,3,0,0,1,5,4H19a3,3,0,0,1,3,3V8H2ZM19,22H5a3,3,0,0,1-3-3V10H22v9A3,3,0,0,1,19,22Z"/><circle cx="12" cy="15" r="1.5"/><circle cx="7" cy="15" r="1.5"/><circle cx="17" cy="15" r="1.5"/></symbol>
+<symbol id="i-ajustes" viewBox="0 0 24 24"><g id="_01_align_center" data-name="01 align center"><path d="M15,24H9V20.487a9,9,0,0,1-2.849-1.646L3.107,20.6l-3-5.2L3.15,13.645a9.1,9.1,0,0,1,0-3.29L.107,8.6l3-5.2L6.151,5.159A9,9,0,0,1,9,3.513V0h6V3.513a9,9,0,0,1,2.849,1.646L20.893,3.4l3,5.2L20.85,10.355a9.1,9.1,0,0,1,0,3.29L23.893,15.4l-3,5.2-3.044-1.758A9,9,0,0,1,15,20.487Zm-4-2h2V18.973l.751-.194A6.984,6.984,0,0,0,16.994,16.9l.543-.553,2.623,1.515,1-1.732-2.62-1.513.206-.746a7.048,7.048,0,0,0,0-3.75l-.206-.746,2.62-1.513-1-1.732L17.537,7.649,16.994,7.1a6.984,6.984,0,0,0-3.243-1.875L13,5.027V2H11V5.027l-.751.194A6.984,6.984,0,0,0,7.006,7.1l-.543.553L3.84,6.134l-1,1.732L5.46,9.379l-.206.746a7.048,7.048,0,0,0,0,3.75l.206.746L2.84,16.134l1,1.732,2.623-1.515.543.553a6.984,6.984,0,0,0,3.243,1.875l.751.194Zm1-6a4,4,0,1,1,4-4A4,4,0,0,1,12,16Zm0-6a2,2,0,1,0,2,2A2,2,0,0,0,12,10Z"/></g></symbol>
+<symbol id="i-busqueda" viewBox="0 0 513.749 513.749"><g> <path d="M504.352,459.061l-99.435-99.477c74.402-99.427,54.115-240.344-45.312-314.746S119.261-9.277,44.859,90.15 S-9.256,330.494,90.171,404.896c79.868,59.766,189.565,59.766,269.434,0l99.477,99.477c12.501,12.501,32.769,12.501,45.269,0 c12.501-12.501,12.501-32.769,0-45.269L504.352,459.061z M225.717,385.696c-88.366,0-160-71.634-160-160s71.634-160,160-160 s160,71.634,160,160C385.623,314.022,314.044,385.602,225.717,385.696z"/> </g></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><path d="M12,0A12,12,0,1,0,24,12,12.013,12.013,0,0,0,12,0Zm0,22A10,10,0,1,1,22,12,10.011,10.011,0,0,1,12,22Z"/><path d="M12,10H11a1,1,0,0,0,0,2h1v6a1,1,0,0,0,2,0V12A2,2,0,0,0,12,10Z"/><circle cx="12" cy="6.5" r="1.5"/></symbol>
+<symbol id="i-agregar" viewBox="0 0 24 24"><path d="m12 0a12 12 0 1 0 12 12 12.013 12.013 0 0 0 -12-12zm4 13h-3v3a1 1 0 0 1 -2 0v-3h-3a1 1 0 0 1 0-2h3v-3a1 1 0 0 1 2 0v3h3a1 1 0 0 1 0 2z"/></symbol>
+<symbol id="i-agregar-usuario" viewBox="0 0 24 24"><path d="M23,11H21V9a1,1,0,0,0-2,0v2H17a1,1,0,0,0,0,2h2v2a1,1,0,0,0,2,0V13h2a1,1,0,0,0,0-2Z"/><path d="M9,12A6,6,0,1,0,3,6,6.006,6.006,0,0,0,9,12ZM9,2A4,4,0,1,1,5,6,4,4,0,0,1,9,2Z"/><path d="M9,14a9.01,9.01,0,0,0-9,9,1,1,0,0,0,2,0,7,7,0,0,1,14,0,1,1,0,0,0,2,0A9.01,9.01,0,0,0,9,14Z"/></symbol>
+<symbol id="i-usuarios" viewBox="0 0 24 24"><path d="M12,16a4,4,0,1,1,4-4A4,4,0,0,1,12,16ZM5.683,16H1a1,1,0,0,1-1-1A6.022,6.022,0,0,1,5.131,9.084a1,1,0,0,1,1.1,1.266A6.009,6.009,0,0,0,6,12a5.937,5.937,0,0,0,.586,2.57,1,1,0,0,1-.9,1.43ZM17,24H7a1,1,0,0,1-1-1,6,6,0,0,1,12,0A1,1,0,0,1,17,24ZM18,8a4,4,0,1,1,4-4A4,4,0,0,1,18,8ZM6,8a4,4,0,1,1,4-4A4,4,0,0,1,6,8Zm17,8H18.317a1,1,0,0,1-.9-1.43A5.937,5.937,0,0,0,18,12a6.009,6.009,0,0,0-.236-1.65,1,1,0,0,1,1.105-1.266A6.022,6.022,0,0,1,24,15,1,1,0,0,1,23,16Z"/></symbol>
+<symbol id="i-github" viewBox="0 0 512.000000 512.000000"><g transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)" fill="currentColor" stroke="none"> <path d="M2247 4995 c-1043 -126 -1913 -881 -2167 -1880 -59 -234 -74 -356 -74 -610 -1 -129 5 -259 13 -315 108 -783 536 -1431 1212 -1841 206 -124 479 -239 570 -239 45 0 55 4 85 34 22 22 34 44 35 63 2 40 -3 448 -4 449 -1 1 -42 -5 -92 -13 -108 -17 -273 -12 -360 12 -115 30 -202 79 -279 158 -64 63 -81 90 -144 217 -83 169 -138 244 -230 308 -142 100 -165 144 -87 171 31 10 54 11 103 3 136 -22 259 -109 355 -251 120 -178 219 -247 389 -271 78 -11 185 1 285 31 71 22 71 22 98 131 18 70 67 163 111 209 l25 26 -63 7 c-103 12 -293 55 -386 88 -168 59 -276 123 -395 237 -222 212 -326 520 -314 931 4 141 9 178 31 255 36 121 88 223 164 323 48 64 60 86 53 100 -21 40 -41 168 -41 261 0 107 18 219 50 317 25 73 38 78 145 63 136 -19 330 -99 506 -209 71 -45 80 -48 111 -39 84 24 309 59 450 69 228 17 538 -10 737 -64 l54 -15 91 56 c175 108 358 183 495 203 108 15 117 10 145 -79 13 -42 29 -111 36 -154 17 -103 8 -293 -17 -372 l-19 -60 46 -56 c150 -187 212 -376 211 -645 -1 -671 -304 -1054 -930 -1179 -64 -12 -142 -26 -174 -30 l-58 -7 35 -38 c43 -48 88 -135 112 -216 15 -51 18 -122 23 -504 5 -334 9 -451 19 -467 17 -31 63 -53 108 -53 93 0 453 163 659 297 165 109 299 219 435 359 385 395 615 869 691 1424 20 144 17 507 -5 655 -172 1140 -1081 2015 -2234 2150 -154 18 -464 18 -615 0z"/></g></symbol>
+<symbol id="i-youtube" viewBox="0 0 24 24"><g id="XMLID_184_"> <path d="M23.498,6.186c-0.276-1.039-1.089-1.858-2.122-2.136C19.505,3.546,12,3.546,12,3.546s-7.505,0-9.377,0.504 C1.591,4.328,0.778,5.146,0.502,6.186C0,8.07,0,12,0,12s0,3.93,0.502,5.814c0.276,1.039,1.089,1.858,2.122,2.136 C4.495,20.454,12,20.454,12,20.454s7.505,0,9.377-0.504c1.032-0.278,1.845-1.096,2.122-2.136C24,15.93,24,12,24,12 S24,8.07,23.498,6.186z M9.546,15.569V8.431L15.818,12L9.546,15.569z"/> </g></symbol>
+<symbol id="i-recursos" viewBox="0 0 24 24"><path d="M6 2h12a2 2 0 0 1 2 2v18l-8-4-8 4V4a2 2 0 0 1 2-2Zm2 5a1 1 0 0 0 0 2h8a1 1 0 0 0 0-2H8Zm0 4a1 1 0 0 0 0 2h5a1 1 0 0 0 0-2H8Z"/></symbol>
+<symbol id="i-mesa" viewBox="0 0 24 24"><path d="M3 2h6a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H7v3h5V9a1 1 0 0 1 1-1h2V6a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-1h-1v6h1v-1a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-1h-2a1 1 0 0 1-1-1v-3H7v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/></symbol>
+<symbol id="i-sistema" viewBox="0 0 24 24"><path d="M9 1a1 1 0 0 1 1 1v1h4V2a1 1 0 1 1 2 0v1a3 3 0 0 1 3 3h1a1 1 0 1 1 0 2h-1v3h1a1 1 0 1 1 0 2h-1v3h1a1 1 0 1 1 0 2h-1a3 3 0 0 1-3 3v1a1 1 0 1 1-2 0v-1h-4v1a1 1 0 1 1-2 0v-1H5a3 3 0 0 1-3-3H1a1 1 0 1 1 0-2h1v-3H1a1 1 0 1 1 0-2h1V8H1a1 1 0 0 1 0-2h1a3 3 0 0 1 3-3V2a1 1 0 0 1 1-1h2Zm0 7a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H9Z"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M12 15.5a1 1 0 0 1-.7-.3l-5-5a1 1 0 0 1 1.4-1.4l4.3 4.3 4.3-4.3a1 1 0 0 1 1.4 1.4l-5 5a1 1 0 0 1-.7.3Z"/></symbol>
+<symbol id="i-externo" viewBox="0 0 24 24"><path d="M14 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V5.4l-8.3 8.3a1 1 0 1 1-1.4-1.4L18.6 4H15a1 1 0 0 1-1-1ZM4 6a2 2 0 0 1 2-2h4a1 1 0 1 1 0 2H6v12h12v-4a1 1 0 1 1 2 0v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z"/></symbol>
+</svg>
+
+<!-- ══════════ HEADER ══════════ -->
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="icon-btn menu-toggle" aria-label="Abrir menú">
+      <span class="burger"></span>
+    </button>
+    <a class="brand" href="#inicio">
+      <span class="brand-mark"><svg class="ico"><use href="#i-isotipo"></use></svg></span>
+      <span class="brand-text">
+        <strong>Bitácora</strong>
+        <em>cloud security · 36 meses</em>
+      </span>
+    </a>
+  </div>
+
+  <div class="topbar-search">
+    <svg class="ico"><use href="#i-busqueda"></use></svg>
+    <input type="text" placeholder="Buscar temas, recursos, fases…">
+    <kbd>⌘K</kbd>
+  </div>
+
+  <div class="topbar-right">
+    <span class="status-pill"><i class="dot dot-green"></i>FASE 1</span>
+    <span class="status-pill"><i class="dot dot-yellow"></i>EN CURSO</span>
+    <span class="status-pill"><i class="dot dot-green"></i>SYNC</span>
+  </div>
+</header>
+
+<div class="shell">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="sidebar">
+    <nav class="nav">
+      <p class="nav-label">Estudio</p>
+      <a class="nav-item is-active" href="#inicio" data-view="inicio">
+        <svg class="ico"><use href="#i-inicio"></use></svg><span>Inicio</span>
+      </a>
+      <a class="nav-item" href="#roadmap" data-view="roadmap">
+        <svg class="ico"><use href="#i-roadmap"></use></svg><span>Roadmap</span>
+        <em class="nav-badge">8</em>
+      </a>
+      <a class="nav-item" href="#recursos" data-view="recursos">
+        <svg class="ico"><use href="#i-recursos"></use></svg><span>Recursos</span>
+        <em class="nav-badge">43</em>
+      </a>
+      <a class="nav-item" href="#horario" data-view="horario">
+        <svg class="ico"><use href="#i-calendario"></use></svg><span>Horario</span>
+      </a>
+      <a class="nav-item" href="#mesa" data-view="mesa">
+        <svg class="ico"><use href="#i-mesa"></use></svg><span>Mesa de trabajo</span>
+      </a>
+      <a class="nav-item" href="#labs" data-view="labs">
+        <svg class="ico"><use href="#i-sistema"></use></svg><span>Laboratorios</span>
+        <em class="nav-badge" id="labs-badge">12</em>
+      </a>
+      <a class="nav-item" href="#tutorials" data-view="tutorials">
+        <svg class="ico"><use href="#i-youtube"></use></svg><span>Tutoriales</span>
+      </a>
+
+      <p class="nav-label">Crear</p>
+      <a class="nav-item" href="#import" data-view="import">
+        <svg class="ico"><use href="#i-externo"></use></svg><span>Importar</span>
+      </a>
+      <a class="nav-item" href="#generate" data-view="generate">
+        <svg class="ico"><use href="#i-ia"></use></svg><span>Generar con IA</span>
+      </a>
+
+      <p class="nav-label">Sistema</p>
+      <a class="nav-item" href="#chat" data-view="chat">
+        <svg class="ico"><use href="#i-ia"></use></svg><span>Chat IA</span>
+      </a>
+      <a class="nav-item" href="#cola" data-view="cola">
+        <svg class="ico"><use href="#i-recursos"></use></svg><span>Cola</span>
+        <em class="nav-badge" id="queue-badge" style="display:none">0</em>
+      </a>
+      <a class="nav-item" href="#messages" data-view="messages">
+        <svg class="ico"><use href="#i-info"></use></svg><span>Mensajes</span>
+        <em class="nav-badge" id="msg-badge" style="display:none">0</em>
+      </a>
+      <a class="nav-item" href="#notes" data-view="notes">
+        <svg class="ico"><use href="#i-recursos"></use></svg><span>Notas</span>
+      </a>
+      <a class="nav-item" href="#sistema" data-view="sistema">
+        <svg class="ico"><use href="#i-sistema"></use></svg><span>Panel de sistema</span>
+      </a>
+      <a class="nav-item" href="#config" data-view="config">
+        <svg class="ico"><use href="#i-ajustes"></use></svg><span>Configuración</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="mini-progress">
+        <div class="mini-progress-head">
+          <span>Progreso total</span><strong>12%</strong>
+        </div>
+        <div class="bar"><div class="bar-fill" style="width:12%"></div></div>
+        <p class="mini-progress-note">Fase 1 de 8 · Nov 2026</p>
+      </div>
+      <div class="sidebar-links">
+        <a href="#" class="s-link"><svg class="ico"><use href="#i-github"></use></svg>GitHub</a>
+        <a href="#" class="s-link"><svg class="ico"><use href="#i-info"></use></svg>Acerca de</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════ MAIN ══════════ -->
+  <main class="main">
+
+    <!-- ─────── VISTA: ROADMAP ─────── -->
+    <section class="view" id="view-roadmap">
+      <div class="view-bar">
+        <span class="crumb">roadmap</span>
+        <span class="view-bar-meta">8 fases · 28 temas · 2 certificaciones</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Octubre 2026 → Octubre 2029</h1>
+          <p>Cada fase alimenta a la siguiente. Lo que construyes en la Fase 1 es lo que monitorea la Fase 5.</p>
+        </div>
+
+        <div class="phase-strip">
+          <div class="strip-item" style="--accent:#3fb950"><span>F0</span><div class="bar"><div class="bar-fill" style="width:100%"></div></div></div>
+          <div class="strip-item" style="--accent:#3fb950"><span>F1</span><div class="bar"><div class="bar-fill" style="width:38%"></div></div></div>
+          <div class="strip-item" style="--accent:#58a6ff"><span>F2</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#a371f7"><span>F3</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#d29922"><span>F4</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#f85149"><span>F5</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#39c5cf"><span>F6</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+          <div class="strip-item" style="--accent:#8b949e"><span>F7</span><div class="bar"><div class="bar-fill" style="width:0%"></div></div></div>
+        </div>
+
+        <div class="spine">
+          <div class="spine-track"><div class="spine-fill"></div></div>
+          <div class="spine-nodes">
+
+            <article class="node state-done" style="--accent:#3fb950">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 0</span>
+                  <span class="node-when">Oct 2026</span>
+                </div>
+                <h3>Base del homelab</h3>
+                <p>Proxmox + pfSense/OPNsense como VM desde el día 1. Las 4 VLANs existen aunque estén vacías.</p>
+                <ul class="topic-list">
+                  <li class="topic done">Hypervisor y topología base</li>
+                  <li class="topic done">pfSense/OPNsense perimetral</li>
+                  <li class="topic done">VLANs: Management, Servers, Users, DMZ</li>
+                  <li class="topic done">Repo GitHub + primer post en LinkedIn</li>
+                </ul>
+                <div class="tag-row"><span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>homelab-cloud-security</span></div>
+              </div>
+            </article>
+
+            <article class="node state-current" style="--accent:#3fb950">
+              <div class="node-dot"><i class="pulse"></i></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 1</span>
+                  <span class="node-when">Nov 2026 – Mar 2027</span>
+                </div>
+                <h3>Linux + Networking real</h3>
+                <p>Hardening real de Ubuntu y las 4 VLANs implementadas de verdad en pfSense — reglas aplicadas, no un diagrama.</p>
+                <ul class="topic-list">
+                  <li class="topic done">CIS Benchmark + SSH solo por llave</li>
+                  <li class="topic current">rsyslog centralizado</li>
+                  <li class="topic todo">Backups probados con restore real</li>
+                  <li class="topic todo">Reglas de firewall inter-VLAN</li>
+                  <li class="topic todo">Wireshark: tráfico entre VLANs</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>linux-hardened-server</span>
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>homelab-network-segmentation</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#58a6ff">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 2</span>
+                  <span class="node-when">Abr 2027 – Ago 2027</span>
+                </div>
+                <h3>Windows Server + Ofensiva básica</h3>
+                <p>AD ficticio "Ortiz Technologies" con 100 usuarios, y un ataque simulado contra tu propio dominio.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">Dominio con OUs por departamento</li>
+                  <li class="topic todo">GPOs: LAPS, SMBv1 off, PowerShell restringido</li>
+                  <li class="topic todo">ADCS interna + servidor de archivos con DFS</li>
+                  <li class="topic todo">Kerberoasting / AS-REP Roasting documentado</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>ad-lab-attack-detection</span>
+                  <span class="tag tag-cert">CompTIA Security+</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#a371f7">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 3</span>
+                  <span class="node-when">Sep 2027 – Feb 2028</span>
+                </div>
+                <h3>AWS + Infraestructura como código</h3>
+                <p>Multi-cuenta con Organizations, IAM de mínimo privilegio, Terraform con state remoto y pipeline real.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">AWS Organizations: cuentas dev/prod</li>
+                  <li class="topic todo">VPC, subnets, NAT, Security Groups, NACLs</li>
+                  <li class="topic todo">State remoto: S3 + DynamoDB locking</li>
+                  <li class="topic todo">GitHub Actions: plan en PR, apply en merge</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>aws-infra-as-code</span>
+                  <span class="tag tag-cert">AWS Solutions Architect Associate</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#d29922">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 4</span>
+                  <span class="node-when">Mar 2028 – Ago 2028</span>
+                </div>
+                <h3>Docker + Kubernetes con carga real</h3>
+                <p>Cluster de 1 master + 2 workers sobre Proxmox, desplegando el stack que usará la Fase 5.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">Cluster K8s real en el homelab</li>
+                  <li class="topic todo">GitOps con ArgoCD</li>
+                  <li class="topic todo">Trivy escaneando imágenes en el pipeline</li>
+                </ul>
+                <div class="tag-row"><span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>k8s-homelab-platform</span></div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#f85149">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 5</span>
+                  <span class="node-when">Sep 2028 – Feb 2029</span>
+                </div>
+                <h3>SOC casero + AWS Security avanzado</h3>
+                <p>Wazuh + Suricata + Grafana ingiriendo todos los logs. Ejercicio purple team contra tu propio homelab.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">SOC completo, no herramientas sueltas</li>
+                  <li class="topic todo">Cadena de ataque completa + detección</li>
+                  <li class="topic todo">GuardDuty, Security Hub, Config, alertas SNS</li>
+                  <li class="topic todo">Reporte de incidente publicado</li>
+                </ul>
+                <div class="tag-row">
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>homelab-soc</span>
+                  <span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>incident-report</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#39c5cf">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 6</span>
+                  <span class="node-when">Mar 2029 – Jun 2029</span>
+                </div>
+                <h3>IA aplicada a seguridad</h3>
+                <p>RAG local que ingiere las alertas reales de tu propio Wazuh — no un dataset genérico de ejemplo.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">AI SOC Assistant: Ollama + vector DB</li>
+                  <li class="topic todo">AI Cloud Assistant: revisión de Terraform</li>
+                  <li class="topic todo">AI Homelab Assistant</li>
+                </ul>
+                <div class="tag-row"><span class="tag tag-repo"><svg class="ico"><use href="#i-github"></use></svg>ai-soc-assistant</span></div>
+              </div>
+            </article>
+
+            <article class="node" style="--accent:#8b949e">
+              <div class="node-dot"></div>
+              <div class="node-card">
+                <div class="node-head">
+                  <span class="node-idx">FASE 7</span>
+                  <span class="node-when">Jul 2029 – Oct 2029</span>
+                </div>
+                <h3>Preparación de búsqueda de empleo</h3>
+                <p>No se construye portafolio desde cero — se pule lo documentado desde la Fase 0.</p>
+                <ul class="topic-list">
+                  <li class="topic todo">8–12 repos ya documentados</li>
+                  <li class="topic todo">CV en formato canadiense</li>
+                  <li class="topic todo">Simulacros: explicar arquitectura, no teoría</li>
+                </ul>
+              </div>
+            </article>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: RECURSOS ─────── -->
+    <section class="view" id="view-recursos">
+      <div class="view-bar">
+        <span class="crumb">recursos</span>
+        <span class="view-bar-meta">43 recursos · 9 fases</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Recursos</h1>
+          <p>Todo lo que alimenta cada fase, filtrado por categoría y momento del roadmap.</p>
+        </div>
+
+        <div class="filter-bar">
+          <div class="search-field">
+            <svg class="ico"><use href="#i-busqueda"></use></svg>
+            <input type="text" placeholder="Buscar por título o descripción…">
+          </div>
+          <div class="chip-row">
+            <button class="chip is-on">Todos</button>
+            <button class="chip">YouTube</button>
+            <button class="chip">Blog</button>
+            <button class="chip">Docs</button>
+            <button class="chip">Curso</button>
+            <button class="chip">GitHub</button>
+            <button class="chip">Lab</button>
+            <button class="chip">Inglés</button>
+          </div>
+          <div class="chip-row chip-row-phase">
+            <button class="chip chip-sm is-on">F0</button>
+            <button class="chip chip-sm">F1</button>
+            <button class="chip chip-sm">F2</button>
+            <button class="chip chip-sm">F3</button>
+            <button class="chip chip-sm">F4</button>
+            <button class="chip chip-sm">F5</button>
+            <button class="chip chip-sm">F6</button>
+            <button class="chip chip-sm">F7</button>
+            <button class="chip chip-sm">FX</button>
+          </div>
+        </div>
+
+        <div class="res-grid">
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-youtube"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Proxmox VE desde cero</strong>
+            <p>Instalación del hypervisor, creación de VMs y virtual switches.</p>
+            <div class="tag-row"><span class="tag tag-green">F0</span><span class="tag tag-blue">YouTube</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>pfSense Documentation</strong>
+            <p>Referencia oficial de reglas de firewall y configuración de VLANs.</p>
+            <div class="tag-row"><span class="tag tag-green">F0</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>CIS Benchmarks — Ubuntu</strong>
+            <p>Guía de hardening que se aplica manualmente en la Fase 1.</p>
+            <div class="tag-row"><span class="tag tag-green">F1</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-github"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Wireshark Sample Captures</strong>
+            <p>Capturas de ejemplo para practicar análisis de tráfico.</p>
+            <div class="tag-row"><span class="tag tag-green">F1</span><span class="tag tag-blue">GitHub</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-mesa"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>TryHackMe — Active Directory</strong>
+            <p>Laboratorio guiado de enumeración y ataques básicos a AD.</p>
+            <div class="tag-row"><span class="tag tag-green">F2</span><span class="tag tag-blue">Lab</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Terraform Registry — AWS</strong>
+            <p>Documentación del provider y módulos oficiales.</p>
+            <div class="tag-row"><span class="tag tag-green">F3</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-youtube"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Kubernetes the Hard Way</strong>
+            <p>Montar el cluster componente por componente, sin atajos.</p>
+            <div class="tag-row"><span class="tag tag-green">F4</span><span class="tag tag-blue">GitHub</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-recursos"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Wazuh — Documentación</strong>
+            <p>Instalación del manager, agentes y reglas de detección.</p>
+            <div class="tag-row"><span class="tag tag-green">F5</span><span class="tag tag-blue">Docs</span></div>
+          </a>
+          <a class="res-card" href="#">
+            <div class="res-top">
+              <span class="res-logo"><svg class="ico"><use href="#i-ia"></use></svg></span>
+              <svg class="ico res-ext"><use href="#i-externo"></use></svg>
+            </div>
+            <strong>Ollama + RAG local</strong>
+            <p>Base para el AI SOC Assistant de la Fase 6.</p>
+            <div class="tag-row"><span class="tag tag-green">F6</span><span class="tag tag-blue">Blog</span></div>
+          </a>
+        </div>
+
+        <button class="btn btn-ghost btn-block">
+          <svg class="ico"><use href="#i-agregar"></use></svg>
+          Agregar recurso
+        </button>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: HORARIO ─────── -->
+    <section class="view" id="view-horario">
+      <div class="view-bar">
+        <span class="crumb">horario</span>
+        <span class="view-bar-meta">julio 2026</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head-row">
+          <div class="section-head">
+            <h1>Horario</h1>
+            <p>La rutina fija, semana tras semana, durante 36 meses.</p>
+          </div>
+          <div class="seg">
+            <button class="seg-btn is-on">Semana</button>
+            <button class="seg-btn">Mes</button>
+          </div>
+        </div>
+
+        <div class="week-cards">
+          <div class="day" style="--accent:#3fb950"><span class="day-name">LUN</span><strong>Linux / Sistemas</strong><span class="day-note">2h</span></div>
+          <div class="day" style="--accent:#58a6ff"><span class="day-name">MAR</span><strong>Networking</strong><span class="day-note">2h</span></div>
+          <div class="day is-today" style="--accent:#a371f7"><span class="day-name">MIÉ</span><strong>Cloud</strong><span class="day-note">2h</span></div>
+          <div class="day" style="--accent:#f85149"><span class="day-name">JUE</span><strong>Security</strong><span class="day-note">2h</span></div>
+          <div class="day" style="--accent:#d29922"><span class="day-name">VIE</span><strong>Inglés + docs</strong><span class="day-note">2h</span></div>
+          <div class="day is-weekend" style="--accent:#39c5cf"><span class="day-name">SÁB</span><strong>Laboratorio profundo</strong><span class="day-note">6h</span></div>
+          <div class="day is-weekend" style="--accent:#39c5cf"><span class="day-name">DOM</span><strong>Proyecto + bitácora</strong><span class="day-note">6h</span></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Julio 2026</h2>
+              <span class="stat-value">38%</span>
+              <span class="stat-label">Fase actual</span>
+            </div>
+            <div class="stat">
+              <svg class="ico stat-ico"><use href="#i-youtube"></use></svg>
+              <span class="stat-value">67</span>
+              <span class="stat-label">Videos vistos</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Fase actual</h2>
+              <span class="tag tag-green">Nov 2026 – Mar 2027</span>
+            </div>
+            <div class="panel-body">
+              <p class="panel-topic">Hardening de Linux + segmentación con VLANs</p>
+              <div class="bar"><div class="bar-fill" style="width:38%"></div></div>
+              <ul class="topic-list">
+                <li class="topic done">CIS Benchmark aplicado manualmente</li>
+                <li class="topic done">SSH solo por llave, password auth off</li>
+                <li class="topic current">rsyslog centralizado</li>
+                <li class="topic todo">Backups con restore verificado</li>
+                <li class="topic todo">Reglas de firewall inter-VLAN en pfSense</li>
+                <li class="topic todo">Wireshark entre VLANs</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Acciones rápidas</h2></div>
+          <div class="panel-body">
+            <div class="quick-grid">
+              <a class="quick" href="#chat">
+                <svg class="ico"><use href="#i-ia"></use></svg>
+                <strong>Consulta algo</strong>
+                <span>Pregunta al asistente sobre lo que estás estudiando</span>
+              </a>
+              <a class="quick" href="#mesa">
+                <svg class="ico"><use href="#i-mesa"></use></svg>
+                <strong>Dibuja un diagrama</strong>
+                <span>Arma la topología de tu homelab en el canvas</span>
+              </a>
+              <a class="quick" href="#recursos">
+                <svg class="ico"><use href="#i-busqueda"></use></svg>
+                <strong>Busca recursos</strong>
+                <span>43 enlaces filtrados por fase y categoría</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: MESA DE TRABAJO ─────── -->
+    <section class="view" id="view-mesa">
+      <div class="view-bar">
+        <span class="crumb">mesa de trabajo</span>
+        <span class="view-bar-meta">0 nodos · 0 conexiones</span>
+      </div>
+
+      <div class="view-body view-body-flush">
+        <div class="mesa">
+          <aside class="mesa-tools">
+            <p class="tool-label">Nodos</p>
+            <div class="tool-grid">
+              <button class="tool" style="--accent:#3fb950"><span class="tool-ico">PC</span>PC</button>
+              <button class="tool" style="--accent:#58a6ff"><span class="tool-ico">SRV</span>Servidor</button>
+              <button class="tool" style="--accent:#a371f7"><span class="tool-ico">RTR</span>Router</button>
+              <button class="tool" style="--accent:#d29922"><span class="tool-ico">SW</span>Switch</button>
+              <button class="tool" style="--accent:#f85149"><span class="tool-ico">FW</span>Firewall</button>
+              <button class="tool" style="--accent:#39c5cf"><span class="tool-ico">CLD</span>Nube</button>
+              <button class="tool" style="--accent:#8b949e"><span class="tool-ico">DB</span>Base de datos</button>
+              <button class="tool" style="--accent:#e6edf3"><span class="tool-ico">NET</span>Internet</button>
+            </div>
+
+            <p class="tool-label">Conexiones</p>
+            <div class="tool-row">
+              <button class="tool tool-wide"><span class="line-solid"></span>Flecha</button>
+              <button class="tool tool-wide"><span class="line-dashed"></span>Línea</button>
+            </div>
+
+            <p class="tool-label">Plantillas</p>
+            <div class="tool-col">
+              <button class="btn btn-ghost btn-sm">LAN básica</button>
+              <button class="btn btn-ghost btn-sm">DMZ + LAN</button>
+              <button class="btn btn-ghost btn-sm">VPC Cloud</button>
+            </div>
+
+            <div class="tool-foot">
+              <button class="btn btn-ghost btn-sm btn-block">Exportar JSON</button>
+              <button class="btn btn-ghost btn-sm btn-block">Importar JSON</button>
+            </div>
+          </aside>
+
+          <div class="mesa-canvas">
+            <div class="canvas-bar">
+              <div class="zoom">
+                <button class="icon-btn">−</button>
+                <span>100%</span>
+                <button class="icon-btn">+</button>
+              </div>
+              <div class="legend">
+                <span><i class="dot dot-green"></i>PC</span>
+                <span><i class="dot dot-blue"></i>Servidor</span>
+                <span><i class="dot dot-red"></i>Firewall</span>
+                <span><i class="dot dot-cyan"></i>Nube</span>
+              </div>
+            </div>
+            <div class="canvas">
+              <div class="empty">
+                <svg class="ico empty-ico"><use href="#i-mesa"></use></svg>
+                <p>Elige una herramienta y haz clic en el lienzo para colocar tu primer nodo.</p>
+                <span class="empty-hint">Doble clic renombra · Delete elimina · Arrastra para mover</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: CHAT IA ─────── -->
+    <section class="view" id="view-chat">
+      <div class="view-bar">
+        <span class="crumb">chat ia</span>
+        <span class="view-bar-meta">modelo: — · 0 mensajes</span>
+      </div>
+
+      <div class="view-body view-body-flush">
+        <div class="chat">
+          <aside class="chat-side">
+            <div class="field">
+              <label>PROVEEDOR</label>
+              <div class="select">
+                <select>
+                  <option>OpenAI</option>
+                  <option>Anthropic</option>
+                  <option>Google</option>
+                  <option>Ollama</option>
+                  <option>Custom</option>
+                 </select>
+                <svg class="ico"><use href="#i-chevron"></use></svg>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>URL DEL ENDPOINT <em>editable</em></label>
+              <input class="input mono" type="text" value="https://api.openai.com/v1/chat/completions">
+            </div>
+
+            <div class="field">
+              <label>MODELO <em>ej. gpt-4o-mini</em></label>
+              <input class="input mono" type="text" placeholder="gpt-4o-mini">
+            </div>
+
+            <div class="field">
+              <label>CLAVE DE API</label>
+              <div class="input-group">
+                <input class="input mono" type="password" placeholder="sk-...">
+                <button class="btn btn-ghost btn-sm">ver</button>
+              </div>
+            </div>
+
+            <details class="adv">
+              <summary><svg class="ico"><use href="#i-chevron"></use></svg>AJUSTES AVANZADOS</summary>
+              <div class="adv-body">
+                <div class="field"><label>TEMPERATURA</label><input class="input mono" type="text" value="0.7"></div>
+                <div class="field"><label>MAX TOKENS</label><input class="input mono" type="text" value="1024"></div>
+              </div>
+            </details>
+
+            <button class="btn btn-primary btn-block">Probar conexión</button>
+            <button class="btn btn-ghost btn-block">Limpiar chat</button>
+
+            <div class="note">
+              <p><strong>Cómo funciona:</strong> esta página corre 100% en tu navegador. Tu clave se usa solo en memoria, nunca se guarda ni pasa por ningún servidor intermedio.</p>
+              <p><strong>Sobre CORS:</strong> algunos proveedores bloquean peticiones directas desde el navegador. Si una petición falla de inmediato con un error de red, probablemente sea eso — no un problema de tu clave.</p>
+            </div>
+          </aside>
+
+          <div class="chat-main">
+            <div class="chat-quick">
+              <button class="chip chip-sm">VLANs</button>
+              <button class="chip chip-sm">Subnetting</button>
+              <button class="chip chip-sm">SSH</button>
+              <button class="chip chip-sm">Kubernetes</button>
+              <button class="chip chip-sm">AWS</button>
+              <button class="chip chip-sm">Wireshark</button>
+              <button class="chip chip-sm">Terraform</button>
+            </div>
+
+            <div class="chat-log">
+              <div class="empty">
+                <svg class="ico empty-ico"><use href="#i-ia"></use></svg>
+                <p>Elige un proveedor, pon tu clave y presiona <strong>Probar conexión</strong> para empezar.</p>
+                <span class="empty-hint">14 tópicos en la base de conocimiento local</span>
+              </div>
+            </div>
+
+            <div class="chat-input">
+              <textarea placeholder="Escribe un mensaje… (Enter para enviar, Shift+Enter para salto de línea)"></textarea>
+              <button class="btn btn-primary">Enviar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: SISTEMA ─────── -->
+    <section class="view" id="view-sistema">
+      <div class="view-bar">
+        <span class="crumb">panel de sistema</span>
+        <span class="view-bar-meta">v1.0.0</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Panel de sistema</h1>
+          <p>Estado de cada módulo de Bitácora.</p>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat"><span class="stat-value">0</span><span class="stat-label">Mensajes</span></div>
+          <div class="stat"><span class="stat-value">0</span><span class="stat-label">Proveedores</span></div>
+          <div class="stat"><span class="stat-value">14</span><span class="stat-label">KB almacenados</span></div>
+          <div class="stat"><span class="stat-value">1.0.0</span><span class="stat-label">Versión</span></div>
+        </div>
+
+        <div class="mod-grid">
+          <a class="mod" href="#roadmap">
+            <div class="mod-head"><svg class="ico"><use href="#i-roadmap"></use></svg><i class="dot dot-green"></i></div>
+            <strong>Roadmap</strong><span>8 fases · 28 temas</span>
+            <em class="mod-state ok">Operativo</em>
+          </a>
+          <a class="mod" href="#recursos">
+            <div class="mod-head"><svg class="ico"><use href="#i-recursos"></use></svg><i class="dot dot-green"></i></div>
+            <strong>Recursos</strong><span>43 enlaces indexados</span>
+            <em class="mod-state ok">Operativo</em>
+          </a>
+          <a class="mod" href="#horario">
+            <div class="mod-head"><svg class="ico"><use href="#i-calendario"></use></svg><i class="dot dot-green"></i></div>
+            <strong>Horario</strong><span>Rutina semanal activa</span>
+            <em class="mod-state ok">Operativo</em>
+          </a>
+          <a class="mod" href="#mesa">
+            <div class="mod-head"><svg class="ico"><use href="#i-mesa"></use></svg><i class="dot dot-green"></i></div>
+            <strong>Mesa de trabajo</strong><span>3 plantillas disponibles</span>
+            <em class="mod-state ok">Operativo</em>
+          </a>
+          <a class="mod" href="#chat">
+            <div class="mod-head"><svg class="ico"><use href="#i-ia"></use></svg><i class="dot dot-yellow"></i></div>
+            <strong>Chat IA</strong><span>Sin proveedor configurado</span>
+            <em class="mod-state warn">Requiere configuración</em>
+          </a>
+          <a class="mod" href="#config">
+            <div class="mod-head"><svg class="ico"><use href="#i-ajustes"></use></svg><i class="dot dot-green"></i></div>
+            <strong>Configuración</strong><span>Datos locales</span>
+            <em class="mod-state ok">Operativo</em>
+          </a>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Actividad reciente</h2></div>
+          <div class="panel-body">
+            <ul class="activity">
+              <li><i class="dot dot-green"></i><span>Tema completado — <strong>SSH solo por llave</strong></span><em>hace 2 h</em></li>
+              <li><i class="dot dot-blue"></i><span>Recurso agregado — <strong>CIS Benchmarks Ubuntu</strong></span><em>hace 5 h</em></li>
+              <li><i class="dot dot-yellow"></i><span>Entrada de bitácora — <strong>Semana 12</strong></span><em>ayer</em></li>
+              <li><i class="dot dot-green"></i><span>Tema completado — <strong>CIS Benchmark aplicado</strong></span><em>hace 3 días</em></li>
+              <li><i class="dot dot-purple"></i><span>Diagrama guardado — <strong>homelab-topologia-v2</strong></span><em>hace 4 días</em></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Panel: Perfil de usuario -->
+        <div class="panel" id="profile-panel">
+          <div class="panel-head">
+            <h2>Perfil de usuario</h2>
+            <button class="btn btn-primary btn-sm" id="btn-edit-profile">Editar</button>
+          </div>
+          <div class="panel-body" id="profile-display">
+            <!-- Se rellena dinámicamente -->
+          </div>
+          <div class="panel-body" id="profile-form" style="display:none">
+            <!-- Formulario de edición -->
+            <div class="grid-2">
+              <div class="field">
+                <label>Nombre</label>
+                <input type="text" id="profile-first-name" class="input" placeholder="Tu nombre">
+              </div>
+              <div class="field">
+                <label>Apellido</label>
+                <input type="text" id="profile-last-name" class="input" placeholder="Tu apellido">
+              </div>
+            </div>
+            <div class="field">
+              <label>Meta final</label>
+              <input type="text" id="profile-goal" class="input" placeholder="Ej: Cloud Security Engineer en Canada">
+            </div>
+            <div class="grid-3" style="margin-top:12px">
+              <div class="field">
+                <label>Idioma de la IA</label>
+                <div class="select">
+                  <select id="profile-language">
+                    <option value="es">Espanol</option>
+                    <option value="en">English</option>
+                  </select>
+                  <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                </div>
+              </div>
+              <div class="field">
+                <label>Nivel de experiencia</label>
+                <div class="select">
+                  <select id="profile-level">
+                    <option value="principiante">Principiante</option>
+                    <option value="intermedio" selected>Intermedio</option>
+                    <option value="avanzado">Avanzado</option>
+                  </select>
+                  <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                </div>
+              </div>
+              <div class="field">
+                <label>Horas por semana</label>
+                <input type="number" id="profile-weekly-hours" class="input" value="15" min="1" max="80">
+              </div>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label>Zona horaria</label>
+              <div class="select">
+                <select id="profile-timezone">
+                  <option value="America/Santo_Domingo">Santo Domingo (GMT-4)</option>
+                  <option value="America/New_York">New York (GMT-4/5)</option>
+                  <option value="America/Toronto">Toronto (GMT-4/5)</option>
+                  <option value="America/Mexico_City">Mexico City (GMT-6)</option>
+                  <option value="America/Bogota">Bogota (GMT-5)</option>
+                  <option value="America/Lima">Lima (GMT-5)</option>
+                  <option value="America/Santiago">Santiago (GMT-4/3)</option>
+                  <option value="Europe/Madrid">Madrid (GMT+1/2)</option>
+                  <option value="UTC">UTC</option>
+                </select>
+                <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px">
+              <button class="btn btn-ghost" id="btn-cancel-profile">Cancelar</button>
+              <button class="btn btn-primary" id="btn-save-profile">Guardar perfil</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─────── VISTA: CONFIGURACIÓN ─────── -->
+    <section class="view" id="view-config">
+      <div class="view-bar">
+        <span class="crumb">configuración</span>
+        <span class="view-bar-meta">datos locales</span>
+      </div>
+
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Configuración</h1>
+          <p>Proveedores de IA y gestión de tus datos.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Proveedores de IA</h2>
+            <button class="btn btn-primary btn-sm"><svg class="ico"><use href="#i-agregar"></use></svg>Agregar</button>
+          </div>
+          <div class="panel-body">
+            <div class="empty empty-sm">
+              <svg class="ico empty-ico"><use href="#i-ia"></use></svg>
+              <p>Todavía no hay proveedores configurados.</p>
+              <span class="empty-hint">Agrega uno para habilitar el Chat IA</span>
+            </div>
+            <div class="tpl-row">
+              <span class="tpl-label">Plantillas</span>
+              <button class="chip chip-sm">OpenAI</button>
+              <button class="chip chip-sm">Anthropic</button>
+              <button class="chip chip-sm">Google</button>
+              <button class="chip chip-sm">Ollama</button>
+              <button class="chip chip-sm">Custom</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h2>Exportar datos</h2></div>
+            <div class="panel-body">
+              <p class="panel-note">Descarga un JSON con tu roadmap, recursos, horario y bitácora.</p>
+              <button class="btn btn-ghost btn-block">Descargar JSON</button>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Importar datos</h2></div>
+            <div class="panel-body">
+              <p class="panel-note">Pega un JSON o selecciona un archivo exportado.</p>
+              <textarea class="input mono ta-sm" placeholder='{ "roadmap": … }'></textarea>
+              <button class="btn btn-ghost btn-block">Importar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel panel-danger">
+          <div class="panel-head"><h2>Zona de peligro</h2></div>
+          <div class="panel-body">
+            <div class="danger-row">
+              <div>
+                <strong>Eliminar todos los datos</strong>
+                <p class="panel-note">Borra tu progreso, recursos, diagramas y bitácora. No se puede deshacer.</p>
+              </div>
+              <button class="btn btn-danger">Eliminar todo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ VISTA: IMPORTAR ROADMAP ═══════ -->
+    <section class="view" id="view-import">
+      <div class="view-bar">
+        <span class="crumb">importar roadmap</span>
+        <span class="view-bar-meta">markdown · roadmap.sh · JSON</span>
+      </div>
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Importar Roadmap</h1>
+          <p>Trae roadmaps existentes o sube tu propio archivo.</p>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h2>Subir archivo Markdown</h2></div>
+            <div class="panel-body">
+              <p class="panel-note">Arrastra un archivo .md o seleccionalo. La estructura se interpreta automaticamente.</p>
+              <div class="field">
+                <label>Archivo</label>
+                <input type="file" id="import-md-file" class="input" accept=".md,.markdown" style="padding:6px 10px">
+              </div>
+              <div class="field" style="margin-top:12px">
+                <label>Nombre del roadmap</label>
+                <input type="text" id="import-md-title" class="input" placeholder="Ej: Cloud Security Engineer">
+              </div>
+              <button class="btn btn-primary btn-block" id="btn-import-md" style="margin-top:14px">
+                <svg class="ico"><use href="#i-agregar"></use></svg>Importar
+              </button>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h2>Desde roadmap.sh</h2></div>
+            <div class="panel-body">
+              <p class="panel-note">Selecciona un roadmap oficial de roadmap.sh.</p>
+              <div class="field">
+                <label>Roadmap</label>
+                <div class="select">
+                  <select id="import-roadmapsh-select">
+                    <option value="">Selecciona...</option>
+                    <option value="devops">DevOps</option>
+                    <option value="docker">Docker</option>
+                    <option value="kubernetes">Kubernetes</option>
+                    <oder="Tu apellido">
+              </div>
+              <div class="field">
+                <label>Meta final</label>
+                <input type="text" id="profile-goal" class="input" placeholder="Ej: Cloud Security Engineer en Canada">
+              </div>
+              <div class="grid-3" style="margin-top:12px">
+                <div class="field">
+                  <label>Idioma de la IA</label>
+                  <div class="select">
+                    <select id="profile-language">
+                      <option value="es">Espanol</option>
+                      <option value="en">English</option>
+                    </select>
+                    <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Nivel de experiencia</label>
+                  <div class="select">
+                    <select id="profile-level">
+                      <option value="principiante">Principiante</option>
+                      <option value="intermedio" selected>Intermedio</option>
+                      <option value="avanzado">Avanzado</option>
+                    </select>
+                    <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Horas por semana</label>
+                  <input type="number" id="profile-weekly-hours" class="input" value="15" min="1" max="80">
+                </div>
+              </div>
+              <div class="field" style="margin-top:12px">
+                <label>Zona horaria</label>
+                <div class="select">
+                  <select id="profile-timezone">
+                    <option value="America/Santo_Domingo">Santo Domingo (GMT-4)</option>
+                    <option value="America/New_York">New York (GMT-4/5)</option>
+                    <option value="America/Toronto">Toronto (GMT-4/5)</option>
+                    <option value="America/Mexico_City">Mexico City (GMT-6)</option>
+                    <option value="America/Bogota">Bogota (GMT-5)</option>
+                    <option value="America/Lima">Lima (GMT-5)</option>
+                    <option value="America/Santiago">Santiago (GMT-4/3)</option>
+                    <option value="Europe/Madrid">Madrid (GMT+1/2)</option>
+                    <option value="UTC">UTC</option>
+                  </select>
+                  <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;margin-top:16px">
+                <button class="btn btn-ghost" id="btn-cancel-profile">Cancelar</button>
+                <button class="btn btn-primary" id="btn-save-profile">Guardar perfil</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ VISTA: GENERAR ROADMAP CON IA ═══════ -->
+    <section class="view" id="view-generate">
+      <div class="view-bar">
+        <span class="crumb">generar roadmap</span>
+        <span class="view-bar-meta">IA powered</span>
+      </div>
+      <div class="view-body">
+        <div class="hero">
+          <p class="kicker">IA GENERATIVA</p>
+          <h1>Crea un roadmap con <em>Inteligencia Artificial</em></h1>
+          <p class="hero-sub">Describe lo que quieres aprender. La IA generara una estructura completa con temas, recursos y laboratorios.</p>
+        </div>
+        <div class="panel">
+          <div class="panel-body">
+            <div class="field">
+              <label>Que quieres aprender?</label>
+              <textarea id="generate-prompt" class="input mono ta-sm" placeholder="Ej: Quiero aprender Cloud Security para trabajar en AWS. Tengo experiencia en redes y Linux. Tengo 6 meses."></textarea>
+            </div>
+            <div class="grid-2" style="margin-top:12px;margin-bottom:0">
+              <div class="field">
+                <label>Nivel actual</label>
+                <div class="select">
+                  <select id="generate-level">
+                    <option value="beginner">Principiante</option>
+                    <option value="intermediate">Intermedio</option>
+                    <option value="advanced">Avanzado</option>
+                  </select>
+                  <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                </div>
+              </div>
+              <div class="field">
+                <label>Duracion estimada</label>
+                <div class="select">
+                  <select id="generate-duration">
+                    <option value="3">3 meses</option>
+                    <option value="6">6 meses</option>
+                    <option value="12" selected>12 meses</option>
+                    <option value="24">24 meses</option>
+                    <option value="36">36 meses</option>
+                  </select>
+                  <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-generate-roadmap" style="margin-top:14px">
+              <svg class="ico"><use href="#i-ia"></use></svg>Generar roadmap
+            </button>
+          </div>
+        </div>
+        <div class="panel" id="generate-result-panel" style="display:none">
+          <div class="panel-head"><h2>Resultado</h2><span class="tag tag-green" id="generate-status-tag">Generando...</span></div>
+          <div class="panel-body" id="generate-result-area"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ VISTA: LABORATORIOS ═══════ -->
+    <section class="view" id="view-labs">
+      <div class="view-bar">
+        <span class="crumb">laboratorios</span>
+        <span class="view-bar-meta">plataformas interactivas</span>
+      </div>
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Laboratorios</h1>
+          <p>Practica en entornos reales. Selecciona una plataforma para ver los labs relacionados.</p>
+        </div>
+        <div class="filter-bar">
+          <div class="search-field">
+            <svg class="ico"><use href="#i-busqueda"></use></svg>
+            <input type="text" id="labs-search" placeholder="Buscar laboratorios...">
+          </div>
+          <div class="chip-row" id="labs-platform-chips">
+            <button class="chip chip-sm is-on" data-platform="all">Todos</button>
+            <button class="chip chip-sm" data-platform="tryhackme">TryHackMe</button>
+            <button class="chip chip-sm" data-platform="hackthebox">HackTheBox</button>
+            <button class="chip chip-sm" data-platform="letsdefend">LetsDefend</button>
+            <button class="chip chip-sm" data-platform="aws_skill_builder">AWS Skill Builder</button>
+            <button class="chip chip-sm" data-platform="azure_learn">Azure Learn</button>
+            <button class="chip chip-sm" data-platform="google_cloud_skills">Google Cloud Skills</button>
+            <button class="chip chip-sm" data-platform="kodekloud">KodeKloud</button>
+            <button class="chip chip-sm" data-platform="portswigger">PortSwigger</button>
+            <button class="chip chip-sm" data-platform="overthewire">OverTheWire</button>
+            <button class="chip chip-sm" data-platform="picoctf">PicoCTF</button>
+            <button class="chip chip-sm" data-platform="other">Otros</button>
+          </div>
+        </div>
+        <div class="res-grid" id="labs-grid"></div>
+      </div>
+    </section>
+
+    <!-- ═══════ VISTA: CENTRO DE MENSAJES ═══════ -->
+    <section class="view" id="view-messages">
+      <div class="view-bar">
+        <span class="crumb">centro de inteligencia</span>
+        <span class="view-bar-meta">noticias · alertas · sugerencias</span>
+      </div>
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Centro de Inteligencia</h1>
+          <p>Todo lo que la IA y el sistema detectan para ti.</p>
+        </div>
+        <div class="filter-bar">
+          <div class="chip-row" id="msg-category-chips">
+            <button class="chip chip-sm is-on" data-cat="all">Todos</button>
+            <button class="chip chip-sm" data-cat="news">Noticias</button>
+            <button class="chip chip-sm" data-cat="resource">Recursos</button>
+            <button class="chip chip-sm" data-cat="update">Actualizaciones</button>
+            <button class="chip chip-sm" data-cat="ai_suggestion">Sugerencias IA</button>
+            <button class="chip chip-sm" data-cat="system">Sistema</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-body" id="messages-list">
+            <div class="empty">
+              <svg class="ico empty-ico"><use href="#i-info"></use></svg>
+              <p>No hay mensajes pendientes.</p>
+              <span class="empty-hint">Los mensajes aparecen cuando la IA detecta novedades.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ VISTA: NOTAS ═══════ -->
+    <section class="view" id="view-notes">
+      <div class="view-bar">
+        <span class="crumb">notas</span>
+        <span class="view-bar-meta">markdown · auto-guardado</span>
+      </div>
+      <div class="view-body">
+        <div class="section-head" style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <h1>Notas</h1>
+            <p>Tus apuntes y pensamientos, organizados por tema.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-new-note">
+            <svg class="ico"><use href="#i-agregar"></use></svg>Nueva nota
+          </button>
+        </div>
+        <div class="grid-2" style="grid-template-columns:260px 1fr">
+          <div class="panel" style="max-height:calc(100vh - 220px);overflow-y:auto">
+            <div class="panel-head"><h2>Tus notas</h2></div>
+            <div class="panel-body" id="notes-sidebar-list">
+              <div class="empty empty-sm">
+                <p>Sin notas aun.</p>
+                <span class="empty-hint">Crea tu primera nota.</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel" id="notes-editor-panel" style="display:none">
+            <div class="panel-head" style="gap:8px">
+              <input type="text" id="note-title-input" class="input" placeholder="Titulo de la nota..." style="flex:1;font-size:14px;font-weight:600;background:transparent;border:none;padding:0">
+              <button class="btn btn-ghost btn-xs" id="btn-delete-note">Eliminar</button>
+              <button class="btn btn-primary btn-sm" id="btn-save-note">Guardar</button>
+            </div>
+            <div class="panel-body" style="padding:0">
+              <textarea id="note-content-input" class="input mono" placeholder="Escribe en markdown..." style="width:100%;min-height:400px;border:none;border-radius:0;resize:vertical;padding:18px;line-height:1.7;font-size:13px"></textarea>
+            </div>
+          </div>
+          <div class="panel" id="notes-empty-panel">
+            <div class="panel-body" style="display:grid;place-items:center;min-height:300px">
+              <div class="empty">
+                <svg class="ico empty-ico"><use href="#i-info"></use></svg>
+                <p>Selecciona una nota o crea una nueva.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ VISTA: TUTORIALES ═══════ -->
+    <section class="view" id="view-tutorials">
+      <div class="view-bar">
+        <span class="crumb">tutoriales</span>
+        <span class="view-bar-meta">videos · cursos · playlists</span>
+      </div>
+      <div class="view-body">
+        <div class="section-head">
+          <h1>Tutoriales</h1>
+          <p>Contenido educativo relacionado con cada fase del roadmap.</p>
+        </div>
+        <div class="filter-bar">
+          <div class="search-field">
+            <svg class="ico"><use href="#i-busqueda"></use></svg>
+            <input type="text" id="tutorials-search" placeholder="Buscar tutoriales...">
+          </div>
+          <div class="chip-row" id="tutorials-type-chips">
+            <button class="chip chip-sm is-on" data-type="all">Todos</button>
+            <button class="chip chip-sm" data-type="video">Video</button>
+            <button class="chip chip-sm" data-type="course">Curso</button>
+            <button class="chip chip-sm" data-type="playlist">Playlist</button>
+            <button class="chip chip-sm" data-type="conference">Conferencia</button>
+            <button class="chip chip-sm" data-type="official">Oficial</button>
+          </div>
+        </div>
+        <div class="res-grid" id="tutorials-grid"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════
+   Bitácora — solo maquetación.
+   Este archivo únicamente carga los iconos, cambia de vista
+   y abre/cierra el menú en móvil. No hay lógica de datos,
+   persistencia, ni llamadas a ningún proveedor.
+   ══════════════════════════════════════════════════════════ */
+
+// 1. Los iconos SVG van inline en el HTML (sprite <symbol>), asi el archivo
+//    funciona abierto directo desde el disco sin servidor.
+
+// 2. Router de vistas por hash
+const views = document.querySelectorAll('.view');
+const navItems = document.querySelectorAll('.nav-item');
+
+function showView(name) {
+  const target = document.getElementById('view-' + name);
+  if (!target) return;
+
+  views.forEach(v => v.classList.remove('is-visible'));
+  target.classList.add('is-visible');
+
+  navItems.forEach(n => n.classList.toggle('is-active', n.dataset.view === name));
+
+  document.querySelector('.sidebar').classList.remove('is-open');
+  window.scrollTo({ top: 0 });
+}
+
+function routeFromHash() {
+  const name = (location.hash || '#inicio').slice(1);
+  showView(name);
+}
+
+window.addEventListener('hashchange', routeFromHash);
+routeFromHash();
+
+// 3. Menú móvil
+document.querySelector('.menu-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.querySelector('.sidebar').classList.toggle('is-open');
+});
+
+document.addEventListener('click', (e) => {
+  const side = document.querySelector('.sidebar');
+  if (side.classList.contains('is-open') && !side.contains(e.target)) {
+    side.classList.remove('is-open');
+  }
+});
+
+// 4. Chips y segmentos: solo el estado visual activo, sin filtrar nada
+document.querySelectorAll('.chip-row, .seg').forEach(group => {
+  group.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip, .seg-btn');
+    if (!btn) return;
+    group.querySelectorAll('.chip, .seg-btn').forEach(b => b.classList.remove('is-on'));
+    btn.classList.add('is-on');
+  });
+});
+
+</script>
+
+<!-- Data & Persistence -->
+<script src="data/seed.js?v=2"></script>
+<script src="js/db.js?v=2"></script>
+
+<!-- Feature Modules -->
+<script src="js/subtopics.js?v=2"></script>
+<script src="js/roadmap.js?v=2"></script>
+<script src="js/resources.js?v=2"></script>
+<script src="js/ai-chat.js?v=2"></script>
+<script src="js/link-checker.js?v=2"></script>
+<script src="js/discover.js?v=2"></script>
+<script src="js/queue.js?v=2"></script>
+<script src="js/health.js?v=2"></script>
+<script src="js/projects.js?v=2"></script>
+<script src="js/config.js?v=2"></script>
+<!-- AI Learning OS Extensions -->
+<script src="js/import-roadmap.js?v=2"></script>
+<script src="js/generate-roadmap.js?v=2"></script>
+<script src="js/labs.js?v=2"></script>
+<script src="js/messages.js?v=2"></script>
+<script src="js/notes.js?v=2"></script>
+<script src="js/tutorials.js?v=2"></script>
+<script src="js/profile.js?v=2"></script>
+
+<!-- Main App -->
+<script src="js/app.js?v=2"></script>
+</body>
+</html>
