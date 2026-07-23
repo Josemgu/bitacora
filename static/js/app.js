@@ -156,39 +156,93 @@ const App = (function () {
   ================================================================ */
 
   /**
-   * Retorna la fase actual basada en DB.
-   * @returns {Object|null}
+   * Retorna la fase actual basada en API.
+   * @returns {Promise<Object|null>}
    */
-  function getCurrentPhase() {
-    const db = (typeof DB !== 'undefined' && DB.get) ? DB.get() : null;
-    if (!db || !db.phases) return null;
+  async function getCurrentPhase() {
+    try {
+      const phases = await API.getPhases();
+      if (!phases || !phases.length) return null;
 
-    // Buscar fase con algun topic en status 'current'
-    for (const phase of db.phases) {
-      if (phase.topics && phase.topics.some(t => t.status === 'current')) {
-        return phase;
+      // Buscar fase con algun topic en status 'current'
+      for (const phase of phases) {
+        if (phase.topics && phase.topics.some(t => t.status === 'current')) {
+          return phase;
+        }
       }
-    }
-    // Si no hay, buscar primera fase con status 'current' o 'todo'
-    for (const phase of db.phases) {
-      if (phase.status === 'current' || phase.status === 'todo') {
-        return phase;
+      // Si no hay, buscar primera fase con status 'current' o 'todo'
+      for (const phase of phases) {
+        if (phase.status === 'current' || phase.status === 'todo') {
+          return phase;
+        }
       }
+      // Ultimo recurso: primera fase
+      return phases[0] || null;
+    } catch (err) {
+      console.error('[App] Error getting current phase:', err);
+      return null;
     }
-    // Ultimo recurso: primera fase
-    return db.phases[0] || null;
   }
 
   /**
    * Retorna el tema en curso (status 'current').
    * Solo debe haber uno.
+   * @returns {Promise<Object|null>}
+   */
+  async function getCurrentTopic() {
+    try {
+      const phases = await API.getPhases();
+      if (!phases || !phases.length) return null;
+
+      for (const phase of phases) {
+        if (phase.topics) {
+          for (const topic of phase.topics) {
+            if (topic.status === 'current') {
+              return { ...topic, phaseId: phase.id, phaseName: phase.name };
+            }
+          }
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error('[App] Error getting current topic:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Retorna la fase actual basada en datos ya obtenidos (sincrono).
+   * @param {Array} phases - Array de fases de la API
    * @returns {Object|null}
    */
-  function getCurrentTopic() {
-    const db = (typeof DB !== 'undefined' && DB.get) ? DB.get() : null;
-    if (!db || !db.phases) return null;
+  function getCurrentPhaseFromData(phases) {
+    if (!phases || !phases.length) return null;
 
-    for (const phase of db.phases) {
+    // Buscar fase con algun topic en status 'current'
+    for (const phase of phases) {
+      if (phase.topics && phase.topics.some(t => t.status === 'current')) {
+        return phase;
+      }
+    }
+    // Si no hay, buscar primera fase con status 'current' o 'todo'
+    for (const phase of phases) {
+      if (phase.status === 'current' || phase.status === 'todo') {
+        return phase;
+      }
+    }
+    // Ultimo recurso: primera fase
+    return phases[0] || null;
+  }
+
+  /**
+   * Retorna el tema en curso (status 'current') basado en datos ya obtenidos.
+   * @param {Array} phases - Array de fases de la API
+   * @returns {Object|null}
+   */
+  function getCurrentTopicFromData(phases) {
+    if (!phases || !phases.length) return null;
+
+    for (const phase of phases) {
       if (phase.topics) {
         for (const topic of phase.topics) {
           if (topic.status === 'current') {
@@ -207,62 +261,66 @@ const App = (function () {
   /**
    * Calcula y actualiza los indicadores de progreso global.
    */
-  function updateProgress() {
-    const db = (typeof DB !== 'undefined' && DB.get) ? DB.get() : null;
-    if (!db || !db.phases) return;
+  async function updateProgress() {
+    try {
+      const phases = await API.getPhases();
+      if (!phases || !phases.length) return;
 
-    let totalTopics = 0;
-    let doneTopics = 0;
-    let currentPhaseIndex = 0;
-    let totalPhases = db.phases.length;
+      let totalTopics = 0;
+      let doneTopics = 0;
+      let currentPhaseIndex = 0;
+      let totalPhases = phases.length;
 
-    db.phases.forEach((phase, idx) => {
-      if (phase.topics) {
-        phase.topics.forEach(topic => {
-          totalTopics++;
-          if (topic.status === 'done') doneTopics++;
-        });
+      phases.forEach((phase, idx) => {
+        if (phase.topics) {
+          phase.topics.forEach(topic => {
+            totalTopics++;
+            if (topic.status === 'done') doneTopics++;
+          });
+        }
+        if (phase.status === 'current') {
+          currentPhaseIndex = idx + 1;
+        }
+      });
+
+      const pct = totalTopics > 0 ? Math.round((doneTopics / totalTopics) * 100) : 0;
+
+      // Actualizar sidebar progress bar
+      const barFill = $('.bar-fill');
+      if (barFill) barFill.style.width = pct + '%';
+
+      // Actualizar porcentaje en texto
+      const pctEl = $('.mini-progress-head strong');
+      if (pctEl) pctEl.textContent = pct + '%';
+
+      // Actualizar nota "Fase X de Y"
+      const noteEl = $('.mini-progress-note');
+      if (noteEl) {
+        noteEl.textContent = `Fase ${currentPhaseIndex} de ${totalPhases}`;
       }
-      if (phase.status === 'current') {
-        currentPhaseIndex = idx + 1;
+
+      // Actualizar status pill del header
+      const statusPill = $('.status-pill');
+      if (statusPill) {
+        const phase = await getCurrentPhase();
+        const topic = await getCurrentTopic();
+        if (phase && topic) {
+          statusPill.innerHTML = `<span>${phase.id}</span> <span>EN CURSO</span>`;
+          statusPill.title = `${phase.name}: ${topic.name}`;
+        } else if (phase) {
+          statusPill.innerHTML = `<span>${phase.id}</span> <span>SYNC</span>`;
+        } else {
+          statusPill.innerHTML = `<span>F1</span> <span>SYNC</span>`;
+        }
       }
-    });
 
-    const pct = totalTopics > 0 ? Math.round((doneTopics / totalTopics) * 100) : 0;
-
-    // Actualizar sidebar progress bar
-    const barFill = $('.bar-fill');
-    if (barFill) barFill.style.width = pct + '%';
-
-    // Actualizar porcentaje en texto
-    const pctEl = $('.mini-progress-head strong');
-    if (pctEl) pctEl.textContent = pct + '%';
-
-    // Actualizar nota "Fase X de Y"
-    const noteEl = $('.mini-progress-note');
-    if (noteEl) {
-      noteEl.textContent = `Fase ${currentPhaseIndex} de ${totalPhases}`;
-    }
-
-    // Actualizar status pill del header
-    const statusPill = $('.status-pill');
-    if (statusPill) {
-      const phase = getCurrentPhase();
-      const topic = getCurrentTopic();
-      if (phase && topic) {
-        statusPill.innerHTML = `<span>${phase.id}</span> <span>EN CURSO</span>`;
-        statusPill.title = `${phase.name}: ${topic.name}`;
-      } else if (phase) {
-        statusPill.innerHTML = `<span>${phase.id}</span> <span>SYNC</span>`;
-      } else {
-        statusPill.innerHTML = `<span>F1</span> <span>SYNC</span>`;
+      // Refrescar roadmap visual
+      if (typeof Roadmap !== 'undefined') {
+        if (Roadmap.refreshStrip) Roadmap.refreshStrip();
+        if (Roadmap.refreshSpine) Roadmap.refreshSpine();
       }
-    }
-
-    // Refrescar roadmap visual
-    if (typeof Roadmap !== 'undefined') {
-      if (Roadmap.refreshStrip) Roadmap.refreshStrip();
-      if (Roadmap.refreshSpine) Roadmap.refreshSpine();
+    } catch (err) {
+      console.error('[App] Error updating progress:', err);
     }
   }
 
@@ -274,7 +332,7 @@ const App = (function () {
    * Marca el nav-item activo segun la vista actual.
    * Actualiza badges y progress.
    */
-  function updateSidebar() {
+  async function updateSidebar() {
     const viewName = state.currentView;
 
     // Quitar is-active de todos los nav-items
@@ -290,7 +348,7 @@ const App = (function () {
     }
 
     // Actualizar progress
-    updateProgress();
+    await updateProgress();
   }
 
   /**
@@ -320,34 +378,35 @@ const App = (function () {
   const views = {};
 
   // ---------- INICIO (Dashboard) ----------
-  views.inicio = function () {
-    const db = (typeof DB !== 'undefined' && DB.get) ? DB.get() : null;
-    if (!db) return;
+  views.inicio = async function () {
+    try {
+      const phases = await API.getPhases();
+      const schedule = await API.getSchedule();
+      if (!phases || !phases.length) return;
 
-    const phase = getCurrentPhase();
-    const topic = getCurrentTopic();
+      const phase = getCurrentPhaseFromData(phases);
+      const topic = getCurrentTopicFromData(phases);
 
-    // --- Hero: fase actual ---
-    const heroPhase = $('.hero-phase');
-    const heroTopic = $('.hero-topic');
-    const heroStatus = $('.hero-status');
+      // --- Hero: fase actual ---
+      const heroPhase = $('.hero-phase');
+      const heroTopic = $('.hero-topic');
+      const heroStatus = $('.hero-status');
 
-    if (heroPhase) {
-      heroPhase.textContent = phase ? `${phase.id}: ${phase.name}` : 'Sin fase activa';
-    }
-    if (heroTopic) {
-      heroTopic.textContent = topic ? topic.name : 'Sin tema en curso';
-    }
-    if (heroStatus) {
-      heroStatus.textContent = topic ? 'EN CURSO' : (phase ? phase.status.toUpperCase() : 'SYNC');
-    }
+      if (heroPhase) {
+        heroPhase.textContent = phase ? `${phase.id}: ${phase.name}` : 'Sin fase activa';
+      }
+      if (heroTopic) {
+        heroTopic.textContent = topic ? topic.name : 'Sin tema en curso';
+      }
+      if (heroStatus) {
+        heroStatus.textContent = topic ? 'EN CURSO' : (phase ? phase.status.toUpperCase() : 'SYNC');
+      }
 
-    // --- Stats ---
-    let totalTopics = 0, doneTopics = 0, hoursTotal = 0, videosTotal = 0;
-    let streakDays = db.streakDays || 0;
+      // --- Stats ---
+      let totalTopics = 0, doneTopics = 0, hoursTotal = 0, videosTotal = 0;
+      let streakDays = 0; // TODO: get from profile API
 
-    if (db.phases) {
-      db.phases.forEach(ph => {
+      phases.forEach(ph => {
         if (ph.topics) {
           ph.topics.forEach(t => {
             totalTopics++;
@@ -357,126 +416,141 @@ const App = (function () {
           });
         }
       });
-    }
 
-    // Actualizar stat-row
-    const statEls = $$('.stat-row .stat-value');
-    if (statEls.length >= 4) {
-      statEls[0].textContent = streakDays + (streakDays === 1 ? ' dia' : ' dias');
-      statEls[1].textContent = hoursTotal + 'h';
-      statEls[2].textContent = (totalTopics > 0 ? Math.round((doneTopics / totalTopics) * 100) : 0) + '%';
-      statEls[3].textContent = videosTotal;
-    }
-
-    // --- Panel "Fase actual" ---
-    const currentPhasePanel = $('.panel-fase-actual .panel-body');
-    if (currentPhasePanel && phase && phase.topics) {
-      const currentTopics = phase.topics.filter(t => t.status === 'current' || t.status === 'todo').slice(0, 5);
-      if (currentTopics.length === 0) {
-        currentPhasePanel.innerHTML = '<p class="empty-state">Todos los temas completados en esta fase.</p>';
-      } else {
-        currentPhasePanel.innerHTML = currentTopics.map(t => {
-          const statusClass = t.status === 'current' ? 'status-current' : 'status-todo';
-          const statusLabel = t.status === 'current' ? 'En curso' : 'Pendiente';
-          return `
-            <div class="topic-row ${statusClass}">
-              <span class="topic-name">${escapeHtml(t.name)}</span>
-              <span class="topic-meta">${t.hours || 0}h · ${statusLabel}</span>
-            </div>
-          `;
-        }).join('');
-      }
-    }
-
-    // --- Panel "Esta semana" ---
-    const weekPanel = $('.panel-semana .panel-body');
-    if (weekPanel && db.schedule) {
-      const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
-      const hoy = new Date().getDay();
-      const diasOrdenados = [];
-      for (let i = 0; i < 7; i++) {
-        const idx = (hoy + i) % 7;
-        diasOrdenados.push(diasSemana[idx]);
+      // Actualizar stat-row
+      const statEls = $$('.stat-row .stat-value');
+      if (statEls.length >= 4) {
+        statEls[0].textContent = streakDays + (streakDays === 1 ? ' dia' : ' dias');
+        statEls[1].textContent = hoursTotal + 'h';
+        statEls[2].textContent = (totalTopics > 0 ? Math.round((doneTopics / totalTopics) * 100) : 0) + '%';
+        statEls[3].textContent = videosTotal;
       }
 
-      weekPanel.innerHTML = diasOrdenados.slice(0, 5).map((dia, i) => {
-        const diaData = db.schedule.find(s => s.day === dia);
-        const isToday = i === 0;
-        const topics = diaData ? diaData.topics : [];
-        return `
-          <div class="week-day ${isToday ? 'is-today' : ''}">
-            <span class="week-day-name">${dia}${isToday ? ' (hoy)' : ''}</span>
-            <div class="week-day-topics">
-              ${topics.length > 0
-                ? topics.map(t => `<span class="week-topic">${escapeHtml(t)}</span>`).join('')
-                : '<span class="week-topic week-topic--rest">Descanso</span>'
-              }
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-  };
+      // --- Panel "Fase actual" ---
+      const currentPhasePanel = $('.panel-fase-actual .panel-body');
+      if (currentPhasePanel && phase && phase.topics) {
+        const currentTopics = phase.topics.filter(t => t.status === 'current' || t.status === 'todo').slice(0, 5);
+        if (currentTopics.length === 0) {
+          currentPhasePanel.innerHTML = '<p class="empty-state">Todos los temas completados en esta fase.</p>';
+        } else {
+          currentPhasePanel.innerHTML = currentTopics.map(t => {
+            const statusClass = t.status === 'current' ? 'status-current' : 'status-todo';
+            const statusLabel = t.status === 'current' ? 'En curso' : 'Pendiente';
+            return `
+              <div class="topic-row ${statusClass}">
+                <span class="topic-name">${escapeHtml(t.name)}</span>
+                <span class="topic-meta">${t.hours || 0}h · ${statusLabel}</span>
+              </div>
+            `;
+          }).join('');
+        }
+      }
 
-  // ---------- ROADMAP ----------
-  views.roadmap = function () {
-    if (typeof Roadmap !== 'undefined' && Roadmap.render) {
-      Roadmap.render();
-    }
-  };
+      // --- Panel "Esta semana" ---
+      const weekPanel = $('.panel-semana .panel-body');
+      if (weekPanel && schedule) {
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+        const hoy = new Date().getDay();
+        const diasOrdenados = [];
+        for (let i = 0; i < 7; i++) {
+          const idx = (hoy + i) % 7;
+          diasOrdenados.push(diasSemana[idx]);
+        }
 
-  // ---------- RECURSOS ----------
-  views.recursos = function () {
-    if (typeof Resources !== 'undefined' && Resources.render) {
-      Resources.render();
-    }
-    // Aplicar query params (filtros iniciales)
-    const params = getHashParams();
-    if (params.q && typeof Resources !== 'undefined' && Resources.filterData) {
-      const searchInput = $('.topbar-search');
-      if (searchInput) searchInput.value = params.q;
-      Resources.filterData(params.q);
-    }
-    if (params.phase && typeof Resources !== 'undefined' && Resources.filterByPhase) {
-      Resources.filterByPhase(params.phase);
-    }
-  };
-
-  // ---------- HORARIO ----------
-  views.horario = function () {
-    const db = (typeof DB !== 'undefined' && DB.get) ? DB.get() : null;
-    const viewBody = $('#view-horario .view-body');
-    if (!viewBody) return;
-
-    const diasSemana = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
-    const hoyIdx = (new Date().getDay() + 6) % 7; // 0=Lunes
-    const schedule = (db && db.schedule) ? db.schedule : [];
-
-    viewBody.innerHTML = `
-      <div class="schedule-grid">
-        ${diasSemana.map((dia, idx) => {
+        weekPanel.innerHTML = diasOrdenados.slice(0, 5).map((dia, i) => {
           const diaData = schedule.find(s => s.day === dia);
-          const isToday = idx === hoyIdx;
+          const isToday = i === 0;
           const topics = diaData ? diaData.topics : [];
           return `
-            <div class="schedule-card ${isToday ? 'is-today' : ''}">
-              <div class="schedule-card-header">
-                <span class="schedule-day">${dia}</span>
-                ${isToday ? '<span class="schedule-today-badge">HOY</span>' : ''}
-              </div>
-              <div class="schedule-card-body">
+            <div class="week-day ${isToday ? 'is-today' : ''}">
+              <span class="week-day-name">${dia}${isToday ? ' (hoy)' : ''}</span>
+              <div class="week-day-topics">
                 ${topics.length > 0
-                  ? `<ul class="schedule-topic-list">
-                      ${topics.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
-                    </ul>`
-                  : '<p class="schedule-rest">Dia de descanso</p>'
+                  ? topics.map(t => `<span class="week-topic">${escapeHtml(t)}</span>`).join('')
+                  : '<span class="week-topic week-topic--rest">Descanso</span>'
                 }
               </div>
             </div>
           `;
-        }).join('')}
-      </div>
-    `;
+        }).join('');
+      }
+    } catch (err) {
+      console.error('[App] Error rendering inicio view:', err);
+    }
+  };
+
+  // ---------- ROADMAP ----------
+  views.roadmap = async function () {
+    try {
+      const phases = await API.getPhases();
+      if (typeof Roadmap !== 'undefined' && Roadmap.render) {
+        Roadmap.render(phases);
+      }
+    } catch (err) {
+      console.error('[App] Error rendering roadmap view:', err);
+    }
+  };
+
+  // ---------- RECURSOS ----------
+  views.recursos = async function () {
+    try {
+      const resources = await API.getResources();
+      if (typeof Resources !== 'undefined' && Resources.render) {
+        Resources.render(resources);
+      }
+      // Aplicar query params (filtros iniciales)
+      const params = getHashParams();
+      if (params.q && typeof Resources !== 'undefined' && Resources.filterData) {
+        const searchInput = $('.topbar-search');
+        if (searchInput) searchInput.value = params.q;
+        Resources.filterData(params.q);
+      }
+      if (params.phase && typeof Resources !== 'undefined' && Resources.filterByPhase) {
+        Resources.filterByPhase(params.phase);
+      }
+    } catch (err) {
+      console.error('[App] Error rendering recursos view:', err);
+    }
+  };
+
+  // ---------- HORARIO ----------
+  views.horario = async function () {
+    try {
+      const schedule = await API.getSchedule();
+      const viewBody = $('#view-horario .view-body');
+      if (!viewBody) return;
+
+      const diasSemana = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado', 'Domingo'];
+      const hoyIdx = (new Date().getDay() + 6) % 7; // 0=Lunes
+
+      viewBody.innerHTML = `
+        <div class="schedule-grid">
+          ${diasSemana.map((dia, idx) => {
+            const diaData = schedule.find(s => s.day === dia);
+            const isToday = idx === hoyIdx;
+            const topics = diaData ? diaData.topics : [];
+            return `
+              <div class="schedule-card ${isToday ? 'is-today' : ''}">
+                <div class="schedule-card-header">
+                  <span class="schedule-day">${dia}</span>
+                  ${isToday ? '<span class="schedule-today-badge">HOY</span>' : ''}
+                </div>
+                <div class="schedule-card-body">
+                  ${topics.length > 0
+                    ? `<ul class="schedule-topic-list">
+                        ${topics.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+                      </ul>`
+                    : '<p class="schedule-rest">Dia de descanso</p>'
+                  }
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    } catch (err) {
+      console.error('[App] Error rendering horario view:', err);
+    }
   };
 
   // ---------- MESA ----------
@@ -625,90 +699,132 @@ const App = (function () {
   };
 
   // ---------- SISTEMA ----------
-  views.sistema = function () {
-    if (typeof Health !== 'undefined') {
-      if (Health.renderStatus) Health.renderStatus();
-      if (Health.renderActivity) Health.renderActivity();
-    }
-    if (typeof Profile !== 'undefined' && Profile.render) {
-      Profile.render();
+  views.sistema = async function () {
+    try {
+      // Load health data from API
+      if (typeof Health !== 'undefined') {
+        const healthData = await API.getHealthEvents();
+        if (Health.renderStatus) Health.renderStatus(healthData);
+        if (Health.renderActivity) Health.renderActivity(healthData);
+      }
+      // Load profile data from API
+      if (typeof Profile !== 'undefined' && Profile.render) {
+        const profileData = await API.getProfile();
+        Profile.render(profileData);
+      }
+    } catch (err) {
+      console.error('[App] Error rendering sistema view:', err);
     }
   };
 
   // ---------- CONFIG ----------
-  views.config = function () {
-    if (typeof Config !== 'undefined' && Config.render) {
-      Config.render();
+  views.config = async function () {
+    try {
+      if (typeof Config !== 'undefined' && Config.render) {
+        const configData = await API.getConfig();
+        Config.render(configData);
+      }
+    } catch (err) {
+      console.error('[App] Error rendering config view:', err);
     }
   };
 
   // ---------- COLA ----------
-  views.cola = function () {
-    if (!state.colaViewCreated) {
-      const main = $('.main');
-      if (!main) return;
-      let colaSection = $('#view-cola');
-      if (!colaSection) {
-        colaSection = document.createElement('section');
-        colaSection.className = 'view';
-        colaSection.id = 'view-cola';
-        colaSection.innerHTML = `
-          <div class="view-bar">
-            <span class="crumb">Cola de aprobacion</span>
-            <span class="view-bar-meta">Recursos pendientes por revisar</span>
-          </div>
-          <div class="view-body">
-            <div class="queue-container"></div>
-          </div>
-        `;
-        main.appendChild(colaSection);
+  views.cola = async function () {
+    try {
+      if (!state.colaViewCreated) {
+        const main = $('.main');
+        if (!main) return;
+        let colaSection = $('#view-cola');
+        if (!colaSection) {
+          colaSection = document.createElement('section');
+          colaSection.className = 'view';
+          colaSection.id = 'view-cola';
+          colaSection.innerHTML = `
+            <div class="view-bar">
+              <span class="crumb">Cola de aprobacion</span>
+              <span class="view-bar-meta">Recursos pendientes por revisar</span>
+            </div>
+            <div class="view-body">
+              <div class="queue-container"></div>
+            </div>
+          `;
+          main.appendChild(colaSection);
+        }
+        state.colaViewCreated = true;
       }
-      state.colaViewCreated = true;
-    }
-    if (typeof Queue !== 'undefined' && Queue.render) {
-      Queue.render();
+      if (typeof Queue !== 'undefined' && Queue.render) {
+        const queueData = await API.getResourceQueue();
+        Queue.render(queueData);
+      }
+    } catch (err) {
+      console.error('[App] Error rendering cola view:', err);
     }
   };
 
   // ---------- IMPORTAR ROADMAP ----------
-  views.import = function () {
-    if (typeof ImportRoadmap !== 'undefined' && ImportRoadmap.init) {
-      ImportRoadmap.init();
+  views.import = async function () {
+    try {
+      if (typeof ImportRoadmap !== 'undefined' && ImportRoadmap.init) {
+        ImportRoadmap.init();
+      }
+    } catch (err) {
+      console.error('[App] Error rendering import view:', err);
     }
   };
 
   // ---------- GENERAR ROADMAP CON IA ----------
-  views.generate = function () {
-    if (typeof GenerateRoadmap !== 'undefined' && GenerateRoadmap.init) {
-      GenerateRoadmap.init();
+  views.generate = async function () {
+    try {
+      if (typeof GenerateRoadmap !== 'undefined' && GenerateRoadmap.init) {
+        GenerateRoadmap.init();
+      }
+    } catch (err) {
+      console.error('[App] Error rendering generate view:', err);
     }
   };
 
   // ---------- LABORATORIOS ----------
-  views.labs = function () {
-    if (typeof Labs !== 'undefined' && Labs.init) {
-      Labs.init();
+  views.labs = async function () {
+    try {
+      if (typeof Labs !== 'undefined' && Labs.init) {
+        Labs.init();
+      }
+    } catch (err) {
+      console.error('[App] Error rendering labs view:', err);
     }
   };
 
   // ---------- TUTORIALES ----------
-  views.tutorials = function () {
-    if (typeof Tutorials !== 'undefined' && Tutorials.init) {
-      Tutorials.init();
+  views.tutorials = async function () {
+    try {
+      if (typeof Tutorials !== 'undefined' && Tutorials.init) {
+        Tutorials.init();
+      }
+    } catch (err) {
+      console.error('[App] Error rendering tutorials view:', err);
     }
   };
 
   // ---------- MENSAJES ----------
-  views.messages = function () {
-    if (typeof Messages !== 'undefined' && Messages.init) {
-      Messages.init();
+  views.messages = async function () {
+    try {
+      if (typeof Messages !== 'undefined' && Messages.init) {
+        Messages.init();
+      }
+    } catch (err) {
+      console.error('[App] Error rendering messages view:', err);
     }
   };
 
   // ---------- NOTAS ----------
-  views.notes = function () {
-    if (typeof Notes !== 'undefined' && Notes.init) {
-      Notes.init();
+  views.notes = async function () {
+    try {
+      if (typeof Notes !== 'undefined' && Notes.init) {
+        Notes.init();
+      }
+    } catch (err) {
+      console.error('[App] Error rendering notes view:', err);
     }
   };
 
@@ -740,7 +856,7 @@ const App = (function () {
   /**
    * Maneja la navegacion por hash.
    */
-  function router() {
+  async function router() {
     const hash = window.location.hash || '#inicio';
     const viewName = getHashView();
     const params = getHashParams();
@@ -779,7 +895,7 @@ const App = (function () {
     viewEl.classList.add('is-visible');
 
     // Actualizar sidebar
-    updateSidebar();
+    await updateSidebar();
 
     // Cerrar sidebar en movil
     closeSidebar();
@@ -976,7 +1092,7 @@ const App = (function () {
   /**
    * Punto de entrada principal de la aplicacion.
    */
-  function init() {
+  async function init() {
     console.log('[App] Inicializando Bitacora...');
 
     // Aplicar tema guardado
@@ -988,14 +1104,20 @@ const App = (function () {
       document.documentElement.style.setProperty('--green-dim', savedAccent);
     }
 
-    // Verificar que DB esta inicializado
-    if (typeof DB !== 'undefined' && DB.init && !DB._initialized) {
-      DB.init();
+    // Verificar conectividad con API
+    try {
+      await API.healthCheck();
+      console.log('[App] API conectada correctamente.');
+    } catch (err) {
+      console.error('[App] Error conectando con API:', err);
+      // Mostrar estado offline en UI
+      state.isOnline = false;
+      updateStatusPill();
     }
 
-    // Calcular fase y tema actual
-    state.currentPhase = getCurrentPhase();
-    state.currentTopic = getCurrentTopic();
+    // Calcular fase y tema actual (usando API)
+    state.currentPhase = await getCurrentPhase();
+    state.currentTopic = await getCurrentTopic();
 
     // Inicializar modulos (con manejo de errores individual)
     const modules = [
@@ -1048,7 +1170,7 @@ const App = (function () {
     }
 
     // Actualizar progress global
-    updateProgress();
+    await updateProgress();
 
     // Iniciar monitoreo de health
     if (typeof Health !== 'undefined' && Health.startMonitoring) {

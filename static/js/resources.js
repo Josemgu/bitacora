@@ -1,7 +1,7 @@
 /**
  * resources.js — F2: Recursos con CRUD, filtros en tiempo real y búsqueda con debounce.
  * Namespace: Resources
- * Dependencias: DB (js/db.js), SVG icons (#i-youtube, #i-github, #i-recursos, #i-extlink)
+ * Dependencias: API (js/api.js), SVG icons (#i-youtube, #i-github, #i-recursos, #i-extlink)
  */
 const Resources = (() => {
   'use strict';
@@ -11,7 +11,8 @@ const Resources = (() => {
     category: 'all',
     phase: 'all',
     search: '',
-    debounceTimer: null
+    debounceTimer: null,
+    resources: []
   };
 
   const CATEGORIES = ['youtube', 'blog', 'docs', 'curso', 'github', 'lab', 'ingles'];
@@ -112,10 +113,20 @@ const Resources = (() => {
   };
 
   /* ==================== INIT ==================== */
-  const init = () => {
+  const init = async () => {
     if (!ensureDOM()) return;
+    await loadResources();
     bindEvents();
     render();
+  };
+
+  const loadResources = async () => {
+    try {
+      state.resources = await API.getResources();
+    } catch (err) {
+      console.error('[Resources] Error loading resources:', err);
+      state.resources = [];
+    }
   };
 
   /* ---------- Eventos ---------- */
@@ -206,7 +217,7 @@ const Resources = (() => {
 
   /* ---------- Filtrar datos ---------- */
   const filterData = () => {
-    const all = DB.data.resources || [];
+    const all = state.resources;
     return all.filter(item => {
       /* No archivados */
       if (item.status === 'archived') return false;
@@ -377,7 +388,7 @@ const Resources = (() => {
 
     /* Submit del formulario */
     const $form = $modal.querySelector('#form-add-resource');
-    $form.addEventListener('submit', (e) => {
+    $form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const fd = new FormData($form);
@@ -406,12 +417,18 @@ const Resources = (() => {
         updated_at: nowISO()
       };
 
-      const inserted = DB.insert('resources', newResource);
-      if (inserted) {
-        closeModal();
-        $form.reset();
-        render();
-      } else {
+      try {
+        const inserted = await API.createResource(newResource);
+        if (inserted) {
+          closeModal();
+          $form.reset();
+          await loadResources();
+          render();
+        } else {
+          alert('Error al guardar el recurso.');
+        }
+      } catch (err) {
+        console.error('[Resources] Error creating resource:', err);
         alert('Error al guardar el recurso.');
       }
     });
@@ -421,13 +438,20 @@ const Resources = (() => {
   };
 
   /* ---------- Archivar recurso ---------- */
-  const archiveResource = (id) => {
+  const archiveResource = async (id) => {
     if (!confirm('¿Archivar este recurso? Seguirá disponible pero oculto.')) return;
-    const updated = DB.update('resources', id, {
-      status: 'archived',
-      updated_at: nowISO()
-    });
-    if (updated) render();
+    try {
+      const updated = await API.updateResource(id, {
+        status: 'archived',
+        updated_at: nowISO()
+      });
+      if (updated) {
+        await loadResources();
+        render();
+      }
+    } catch (err) {
+      console.error('[Resources] Error archiving resource:', err);
+    }
   };
 
   /* ==================== API Pública ==================== */
