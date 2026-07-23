@@ -23,7 +23,7 @@ from app.schemas import (
     ProjectChecklistItemBase, ProjectChecklistItemResponse,
 )
 
-router = APIRouter(prefix="/roadmap", tags=["roadmap"])
+router = APIRouter(tags=["roadmap"])
 
 
 # ──────────────────────────────────────────────────────────────────────
