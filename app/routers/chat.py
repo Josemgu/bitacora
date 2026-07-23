@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from app.database import get_db
-from app.models.base import ChatMessage
+from app.models.base import ChatMessage, User
 from app.schemas import ChatMessageCreate, ChatMessageResponse
+from app.services.auth import require_admin
 
 router = APIRouter()
 
@@ -43,7 +44,7 @@ def chat_stream(data: ChatMessageCreate):
 
 
 @router.delete("/messages")
-def clear_history(db: Session = Depends(get_db)):
+def clear_history(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     db.query(ChatMessage).delete()
     db.commit()
     return {"ok": True}

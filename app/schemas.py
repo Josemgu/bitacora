@@ -6,16 +6,18 @@ from __future__ import annotations
 from datetime import datetime, date, time
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.utils.validators import is_safe_url
 
 
 # ──────────────── Roadmap (3 levels) ────────────────
 
 class SubtopicBase(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=400)
     order: int = 0
     done: bool = False
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class SubtopicCreate(SubtopicBase):
@@ -42,7 +44,7 @@ class SubtopicResourceResponse(SubtopicResourceBase):
 
 
 class TopicBase(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=300)
     order: int = 0
     status: str = "todo"
 
@@ -62,9 +64,9 @@ class TopicResponse(TopicBase):
 
 class PhaseBase(BaseModel):
     index: int
-    title: str
-    description: Optional[str] = None
-    accent: str = "#3fb950"
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=5000)
+    accent: str = Field("#3fb950", max_length=7)
     status: str = "todo"
 
 
@@ -115,14 +117,28 @@ class ResourceCategoryResponse(ResourceCategoryBase):
 
 
 class ResourceBase(BaseModel):
-    title: str
-    url: str
-    description: Optional[str] = None
-    logo_url: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=300)
+    url: str = Field(..., max_length=1000)
+    description: Optional[str] = Field(None, max_length=5000)
+    logo_url: Optional[str] = Field(None, max_length=500)
     origin: str = "manual"
     link_status: str = "unknown"
     is_lab: bool = False
     is_tutorial: bool = False
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url(cls, v: str) -> str:
+        if not is_safe_url(v):
+            raise ValueError("url must be a valid http(s) address")
+        return v.strip()
+
+    @field_validator("logo_url")
+    @classmethod
+    def _validate_logo_url(cls, v: Optional[str]) -> Optional[str]:
+        if v and not is_safe_url(v):
+            raise ValueError("logo_url must be a valid http(s) address")
+        return v
 
 
 class ResourceCreate(ResourceBase):
@@ -177,6 +193,8 @@ class MailboxItemBase(BaseModel):
     body: str
     related_id: Optional[int] = None
     requires_auth: bool = False
+    is_actionable: bool = False
+    action_url: Optional[str] = None
     status: str = "unread"
 
 
@@ -212,28 +230,51 @@ class UserProfileResponse(UserProfileBase):
 # ──────────────── AI Provider ────────────────
 
 class AIProviderBase(BaseModel):
-    name: str
-    slug: str
-    endpoint: str
-    api_key_env_var: Optional[str] = None
-    default_model: str
+    name: str = Field(..., min_length=1, max_length=50)
+    slug: str = Field(..., min_length=1, max_length=30)
+    endpoint: str = Field(..., max_length=500)
+    api_key_env_var: Optional[str] = Field(None, max_length=100)
+    default_model: str = Field(..., min_length=1, max_length=100)
     is_local: bool = False
     is_active: bool = False
+
+    @field_validator("endpoint")
+    @classmethod
+    def _validate_endpoint(cls, v: str) -> str:
+        if not is_safe_url(v):
+            raise ValueError("endpoint must be a valid http(s) address")
+        return v.strip()
+
+
+class AIProviderCreate(AIProviderBase):
+    # Raw API key supplied by the client; encrypted before storage and never
+    # returned in any response.
+    api_key: Optional[str] = Field(None, max_length=500)
 
 
 class AIProviderResponse(AIProviderBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     created_at: datetime
+    is_instructor: bool = False
+    # Whether an encrypted key is stored — the key itself is never exposed.
+    has_api_key: bool = False
 
 
 # ──────────────── Chat ────────────────
 
 class ChatMessageBase(BaseModel):
-    role: str
-    content: str
-    attachment_path: Optional[str] = None
-    attachment_type: Optional[str] = None
+    role: str = Field(..., max_length=20)
+    content: str = Field(..., min_length=1, max_length=20000)
+    attachment_path: Optional[str] = Field(None, max_length=500)
+    attachment_type: Optional[str] = Field(None, max_length=20)
+
+    @field_validator("attachment_path")
+    @classmethod
+    def _no_path_traversal(cls, v: Optional[str]) -> Optional[str]:
+        if v and (".." in v or v.startswith("/") or "\\" in v):
+            raise ValueError("attachment_path must not contain path traversal")
+        return v
 
 
 class ChatMessageCreate(ChatMessageBase):
@@ -277,3 +318,37 @@ class DashboardStats(BaseModel):
     total_resources: int
     active_providers: int
     unread_mailbox: int
+
+
+# ──────────────── Auth ────────────────
+
+class UserRegister(BaseModel):
+    username: str = Field(..., min_length=3, max_length=80, pattern=r"^[A-Za-z0-9_.\-]+$")
+    password: str = Field(..., min_length=8, max_length=128)
+    email: Optional[str] = Field(None, max_length=255)
+
+
+class UserLogin(BaseModel):
+    username: str = Field(..., min_length=1, max_length=80)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    username: str
+    email: Optional[str] = None
+    role: str
+    is_active: bool
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None

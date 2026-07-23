@@ -77,6 +77,25 @@ class ExperienceLevel(str, PyEnum):
     avanzado = "avanzado"
 
 
+class UserRole(str, PyEnum):
+    admin = "admin"
+    instructor = "instructor"
+    student = "student"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(80), unique=True, nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=True, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    role = Column(Enum(UserRole), default=UserRole.student, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    last_login = Column(DateTime, nullable=True)
+
+
 class Roadmap(Base):
     __tablename__ = "roadmaps"
 
@@ -86,6 +105,10 @@ class Roadmap(Base):
     source_ref = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    # Change-tracking for roadmap.sh sync (Sprint 2).
+    version_hash = Column(String(64), nullable=True)
+    last_sync_at = Column(DateTime, nullable=True)
+    source_metadata = Column(Text, nullable=True)
 
     phases = relationship("Phase", back_populates="roadmap", cascade="all, delete-orphan")
     resource_categories = relationship("ResourceCategory", back_populates="roadmap", cascade="all, delete-orphan")
@@ -262,6 +285,8 @@ class MailboxItem(Base):
     body = Column(Text, nullable=False)
     related_id = Column(Integer, nullable=True)
     requires_auth = Column(Boolean, default=False)
+    is_actionable = Column(Boolean, default=False, nullable=False)
+    action_url = Column(String(1000), nullable=True)
     status = Column(Enum(MailboxStatus), default=MailboxStatus.unread)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -309,6 +334,9 @@ class UserProfile(Base):
     goal = Column(Text, nullable=True)
     theme = Column(String(10), default="dark")
     accent_color = Column(String(7), default="#3fb950")
+    # AI acting as the active instructor/administrator (Sprint 3).
+    ai_instructor_id = Column(Integer, ForeignKey("ai_providers.id"), nullable=True)
+    last_login = Column(DateTime, nullable=True)
 
 
 class AIProvider(Base):
@@ -319,8 +347,14 @@ class AIProvider(Base):
     slug = Column(String(30), unique=True, nullable=False)
     endpoint = Column(String(500), nullable=False)
     api_key_env_var = Column(String(100), nullable=True)
+    # API key encrypted at rest with Fernet (never stored in plaintext).
+    api_key_encrypted = Column(Text, nullable=True)
     default_model = Column(String(100), nullable=False)
     is_local = Column(Boolean, default=False)
     is_active = Column(Boolean, default=False)
+    # Marks the provider currently acting as the learning instructor.
+    is_instructor = Column(Boolean, default=False, nullable=False)
+    max_retries = Column(Integer, default=3, nullable=False)
+    timeout_seconds = Column(Integer, default=60, nullable=False)
     config_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
