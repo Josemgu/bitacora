@@ -139,6 +139,50 @@
   <!-- ══════════ MAIN ══════════ -->
   <main class="main">
 
+    <!-- ─────── VISTA: INICIO (Dashboard) ─────── -->
+    <section class="view" id="view-inicio">
+      <div class="view-bar">
+        <span class="crumb">inicio</span>
+        <span class="view-bar-meta">Panel general de tu aprendizaje</span>
+      </div>
+      <div class="view-body">
+        <div class="section-head">
+          <h1 class="hero-phase">Cargando...</h1>
+          <p><span class="hero-topic">—</span> · <span class="hero-status tag tag-green">SYNC</span></p>
+        </div>
+
+        <div class="stat-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:18px 0">
+          <div class="panel"><div class="panel-body" style="text-align:center">
+            <div class="stat-value" style="font-size:22px;font-weight:700">0 dias</div>
+            <div style="font-size:11px;color:var(--muted)">Racha</div>
+          </div></div>
+          <div class="panel"><div class="panel-body" style="text-align:center">
+            <div class="stat-value" style="font-size:22px;font-weight:700">0h</div>
+            <div style="font-size:11px;color:var(--muted)">Horas estimadas</div>
+          </div></div>
+          <div class="panel"><div class="panel-body" style="text-align:center">
+            <div class="stat-value" style="font-size:22px;font-weight:700">0%</div>
+            <div style="font-size:11px;color:var(--muted)">Progreso</div>
+          </div></div>
+          <div class="panel"><div class="panel-body" style="text-align:center">
+            <div class="stat-value" style="font-size:22px;font-weight:700">0</div>
+            <div style="font-size:11px;color:var(--muted)">Videos</div>
+          </div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+          <div class="panel panel-fase-actual">
+            <div class="panel-head"><span class="kicker">Fase actual</span></div>
+            <div class="panel-body"><p class="empty-state">Sin datos todavía. Importa o genera un roadmap.</p></div>
+          </div>
+          <div class="panel panel-semana">
+            <div class="panel-head"><span class="kicker">Esta semana</span></div>
+            <div class="panel-body"><p class="empty-state">Sin horario configurado.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ─────── VISTA: ROADMAP ─────── -->
     <section class="view" id="view-roadmap">
       <div class="view-bar">
@@ -624,86 +668,10 @@
     <section class="view" id="view-chat">
       <div class="view-bar">
         <span class="crumb">chat ia</span>
-        <span class="view-bar-meta">modelo: — · 0 mensajes</span>
+        <span class="view-bar-meta">El profesor IA de tu bitácora</span>
       </div>
-
-      <div class="view-body view-body-flush">
-        <div class="chat">
-          <aside class="chat-side">
-            <div class="field">
-              <label>PROVEEDOR</label>
-              <div class="select">
-                <select>
-                  <option>OpenAI</option>
-                  <option>Anthropic</option>
-                  <option>Google</option>
-                  <option>Ollama</option>
-                  <option>Custom</option>
-                 </select>
-                <svg class="ico"><use href="#i-chevron"></use></svg>
-              </div>
-            </div>
-
-            <div class="field">
-              <label>URL DEL ENDPOINT <em>editable</em></label>
-              <input class="input mono" type="text" value="https://api.openai.com/v1/chat/completions">
-            </div>
-
-            <div class="field">
-              <label>MODELO <em>ej. gpt-4o-mini</em></label>
-              <input class="input mono" type="text" placeholder="gpt-4o-mini">
-            </div>
-
-            <div class="field">
-              <label>CLAVE DE API</label>
-              <div class="input-group">
-                <input class="input mono" type="password" placeholder="sk-...">
-                <button class="btn btn-ghost btn-sm">ver</button>
-              </div>
-            </div>
-
-            <details class="adv">
-              <summary><svg class="ico"><use href="#i-chevron"></use></svg>AJUSTES AVANZADOS</summary>
-              <div class="adv-body">
-                <div class="field"><label>TEMPERATURA</label><input class="input mono" type="text" value="0.7"></div>
-                <div class="field"><label>MAX TOKENS</label><input class="input mono" type="text" value="1024"></div>
-              </div>
-            </details>
-
-            <button class="btn btn-primary btn-block">Probar conexión</button>
-            <button class="btn btn-ghost btn-block">Limpiar chat</button>
-
-            <div class="note">
-              <p><strong>Cómo funciona:</strong> esta página corre 100% en tu navegador. Tu clave se usa solo en memoria, nunca se guarda ni pasa por ningún servidor intermedio.</p>
-              <p><strong>Sobre CORS:</strong> algunos proveedores bloquean peticiones directas desde el navegador. Si una petición falla de inmediato con un error de red, probablemente sea eso — no un problema de tu clave.</p>
-            </div>
-          </aside>
-
-          <div class="chat-main">
-            <div class="chat-quick">
-              <button class="chip chip-sm">VLANs</button>
-              <button class="chip chip-sm">Subnetting</button>
-              <button class="chip chip-sm">SSH</button>
-              <button class="chip chip-sm">Kubernetes</button>
-              <button class="chip chip-sm">AWS</button>
-              <button class="chip chip-sm">Wireshark</button>
-              <button class="chip chip-sm">Terraform</button>
-            </div>
-
-            <div class="chat-log">
-              <div class="empty">
-                <svg class="ico empty-ico"><use href="#i-ia"></use></svg>
-                <p>Elige un proveedor, pon tu clave y presiona <strong>Probar conexión</strong> para empezar.</p>
-                <span class="empty-hint">14 tópicos en la base de conocimiento local</span>
-              </div>
-            </div>
-
-            <div class="chat-input">
-              <textarea placeholder="Escribe un mensaje… (Enter para enviar, Shift+Enter para salto de línea)"></textarea>
-              <button class="btn btn-primary">Enviar</button>
-            </div>
-          </div>
-        </div>
+      <div class="view-body view-body-flush" style="height:calc(100vh - 120px)">
+        <div id="ai-chat-view" style="height:100%"></div>
       </div>
     </section>
 
@@ -1288,6 +1256,7 @@ document.querySelectorAll('.chip-row, .seg').forEach(group => {
 <!-- Data & Persistence -->
 <script src="data/seed.js?v=2"></script>
 <script src="js/db.js?v=2"></script>
+<script src="js/api.js?v=3"></script>
 
 <!-- Feature Modules -->
 <script src="js/subtopics.js?v=2"></script>

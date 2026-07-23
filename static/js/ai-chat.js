@@ -573,9 +573,9 @@ const AIChat = (() => {
     }
     const key = state.apiKeys.get(providerId);
     if (key) {
-      $keyNote.innerHTML = `Clave activa: <code>${esc(maskKey(key))}</code>. Tu clave se usa solo en memoria, nunca se guarda.`;
+      $keyNote.innerHTML = 'La clave se guarda cifrada en el servidor.';
     } else {
-      $keyNote.textContent = 'Tu clave se usa solo en memoria, nunca se guarda.';
+      $keyNote.textContent = 'Escribe la clave y envia un mensaje para guardarla cifrada en el servidor.';
     }
   }
 
@@ -598,9 +598,17 @@ const AIChat = (() => {
     loadHistory();
   }
 
-  /** Carga proveedores desde DB. */
-  function loadProviders() {
-    state.providers = DB.getAll('ai_providers');
+  /** Carga proveedores desde el backend (las claves viven cifradas en el servidor). */
+  async function loadProviders() {
+    try {
+      state.providers = await API.getAIProviders();
+      const active = state.providers.find(p => p.is_active);
+      if (active) state.activeProvider = String(active.id);
+    } catch (err) {
+      console.error('[AIChat] Error cargando proveedores:', err);
+      state.providers = [];
+    }
+    renderProviderSelector();
   }
 
   /** Renderiza el layout principal del chat. */
@@ -619,7 +627,7 @@ const AIChat = (() => {
             <div class="field" id="chat-key-field">
               <label class="label" style="font-size:0.875rem;color:#94a3b8;">Clave API</label>
               <input id="chat-api-key" class="input" type="password" placeholder="sk-..." autocomplete="off" style="width:100%;">
-              <p id="chat-key-note" class="note" style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">Tu clave se usa solo en memoria, nunca se guarda.</p>
+              <p id="chat-key-note" class="note" style="font-size:0.75rem;color:#64748b;margin-top:0.25rem;">La clave se guarda cifrada en el servidor; nunca se muestra ni viaja al navegador.</p>
             </div>
             <div style="margin-top:auto;display:flex;flex-direction:column;gap:0.5rem;">
               <button id="chat-clear" class="btn btn-ghost" style="width:100%;">Limpiar chat</button>
@@ -685,10 +693,18 @@ const AIChat = (() => {
     }
 
     if ($providerSelect) {
-      $providerSelect.addEventListener('change', () => {
+      $providerSelect.addEventListener('change', async () => {
         state.activeProvider = $providerSelect.value || null;
         _updateKeyField();
         _updateKeyNote();
+        // Activar el proveedor en el servidor
+        if (state.activeProvider) {
+          try {
+            await API.setActiveAIProvider(parseInt(state.activeProvider));
+          } catch (err) {
+            renderMessage('system', 'No se pudo activar el proveedor: ' + (err.message || ''));
+          }
+        }
       });
     }
 
@@ -698,21 +714,21 @@ const AIChat = (() => {
       $clearBtn.addEventListener('click', clearChat);
     }
 
-    // Boton probar conexion
+    // Boton probar conexion (via backend)
     const $testBtn = document.getElementById('chat-test');
     if ($testBtn) {
       $testBtn.addEventListener('click', async () => {
-        if (!state.activeProvider || state.activeProvider === 'local') {
+        if (!state.activeProvider) {
           renderMessage('system', 'Selecciona un proveedor primero.');
           return;
         }
         renderMessage('system', 'Probando conexion...');
-        const prov = state.providers.find(p => String(p.id) === String(state.activeProvider));
-        const result = await testConnection(prov ? prov.id : state.activeProvider);
-        if (result.ok) {
-          renderMessage('system', `Conexion exitosa en ${result.latencyMs}ms.`);
-        } else {
-          renderMessage('system', `Error: ${result.error}`);
+        const t0 = Date.now();
+        try {
+          await API.sendChatMessage('Responde únicamente: ok');
+          renderMessage('system', `Conexion exitosa en ${Date.now() - t0}ms.`);
+        } catch (err) {
+          renderMessage('system', `Error: ${err.message || 'sin conexión'}`);
         }
       });
     }
@@ -742,23 +758,17 @@ const AIChat = (() => {
 
   /* ═════════════════════════════  SELECTOR DE PROVEEDORES  ═════════════════════════════ */
 
-  /** Renderiza el select de proveedores. */
+  /** Renderiza el select de proveedores (desde el backend). */
   function renderProviderSelector() {
     if (!$providerSelect) return;
 
-    const activeProviders = state.providers.filter(p => p.active !== false);
-
     let html = '<option value="">-- Selecciona proveedor --</option>';
-    html += '<option value="local">Modo local (sin backend)</option>';
-
-    activeProviders.forEach(p => {
-      const label = `${p.name} (${p.model || 'default'})`;
+    state.providers.forEach(p => {
+      const label = `${p.name} (${p.default_model || 'default'})${p.has_api_key ? ' 🔑' : ''}`;
       html += `<option value="${esc(p.id)}">${esc(label)}</option>`;
     });
-
     $providerSelect.innerHTML = html;
 
-    // Restaurar seleccion previa si sigue disponible
     if (state.activeProvider) {
       const opt = $providerSelect.querySelector(`option[value="${state.activeProvider}"]`);
       if (opt) $providerSelect.value = state.activeProvider;
@@ -770,38 +780,32 @@ const AIChat = (() => {
 
   /* ═════════════════════════════  ENVIO DE MENSAJES  ═════════════════════════════ */
 
-  /** Envía un mensaje y muestra la respuesta con streaming. */
+  /**
+   * Envía un mensaje a través del BACKEND (el profesor IA).
+   * La clave API nunca sale del servidor — allí vive cifrada.
+   */
   async function sendMessage(text) {
     if (state.isStreaming) return;
 
-    // Validar proveedor
-    if (!state.activeProvider) {
-      renderMessage('system', 'Selecciona un proveedor de IA primero.');
-      return;
-    }
-
-    const provRecord = state.providers.find(p => String(p.id) === String(state.activeProvider));
-    const isLocalMode = state.activeProvider === 'local';
-
-    // Validar clave (excepto Ollama y modo local con backend)
-    const isOllama = provRecord && (provRecord.name || '').toLowerCase().includes('ollama');
-    const apiKey = _getApiKey(state.activeProvider);
-
-    if (!isLocalMode && !isOllama && !apiKey) {
-      renderMessage('system', 'Introduce una clave API para este proveedor.');
-      return;
-    }
-
-    // Guardar clave del input en memoria
-    if ($keyInput && $keyInput.value.trim() && !isOllama) {
-      state.apiKeys.set(state.activeProvider, $keyInput.value.trim());
+    // Si el usuario escribió una clave, guardarla cifrada en el servidor
+    if ($keyInput && $keyInput.value.trim() && state.activeProvider) {
+      try {
+        await API.request(`/providers/${state.activeProvider}`, {
+          method: 'PATCH',
+          body: { api_key: $keyInput.value.trim() }
+        });
+        $keyInput.value = '';
+        renderMessage('system', 'Clave guardada cifrada en el servidor.');
+        await loadProviders();
+      } catch (err) {
+        renderMessage('system', 'No se pudo guardar la clave: ' + (err.message || 'error'));
+      }
     }
 
     // Añadir mensaje del usuario
     state.messages.push({ role: 'user', content: text });
     renderMessage('user', text);
 
-    // Limpiar input
     if ($chatInput) {
       $chatInput.value = '';
       $chatInput.style.height = 'auto';
@@ -811,26 +815,18 @@ const AIChat = (() => {
     _showTyping();
 
     try {
-      // Construir mensajes con system prompt
-      const systemPrompt = buildSystemPrompt();
-      const allMessages = [
-        { role: 'system', content: systemPrompt },
-        ...state.messages
-      ];
-
-      if (isLocalMode) {
-        await _sendLocal(allMessages, provRecord);
-      } else if (isOllama || (provRecord && (provRecord.endpoint || '').includes('localhost:11434'))) {
-        await _sendOllama(allMessages, provRecord);
-      } else {
-        await _sendDirect(allMessages, provRecord);
-      }
-
+      const res = await API.sendChatMessage(text);
+      _hideTyping();
+      const reply = res.reply || '(sin respuesta)';
+      state.messages.push({ role: 'assistant', content: reply });
+      const $msgEl = _createAssistantElement();
+      if ($msgEl) $msgEl.innerHTML = _renderMarkdown(esc(reply));
+      _scrollToBottom();
       saveHistory();
     } catch (err) {
       console.error('[AIChat] Error en sendMessage:', err);
       _hideTyping();
-      renderMessage('system', _friendlyError(err));
+      renderMessage('system', err.message || _friendlyError(err));
     } finally {
       state.isStreaming = false;
       _hideTyping();

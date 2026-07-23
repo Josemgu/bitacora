@@ -326,7 +326,7 @@ const SEED_DATA = {
       order: 2,
       completed_at: null,
       notes: "",
-    }, },
+    },
     {
       id: 23,
       phase_id: 6,

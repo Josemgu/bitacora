@@ -209,6 +209,27 @@ def reorder_phases(phase_ids: List[int], db: Session = Depends(get_db)):
 # TOPICS
 # ──────────────────────────────────────────────────────────────────────
 
+@router.get("/topics", response_model=List[TopicResponse])
+def list_all_topics(db: Session = Depends(get_db)):
+    """All topics of the active roadmap (flat list, used by the frontend)."""
+    roadmap = get_active_roadmap(db)
+    return (
+        db.query(Topic)
+        .join(Phase, Topic.phase_id == Phase.id)
+        .filter(Phase.roadmap_id == roadmap.id)
+        .order_by(Phase.index, Topic.order)
+        .all()
+    )
+
+
+@router.get("/topics/{topic_id}", response_model=TopicResponse)
+def get_topic(topic_id: int, db: Session = Depends(get_db)):
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(404, "Topic not found")
+    return topic
+
+
 @router.get("/phases/{phase_id}/topics", response_model=List[TopicResponse])
 def list_topics(phase_id: int, db: Session = Depends(get_db)):
     phase = db.query(Phase).filter(Phase.id == phase_id).first()
@@ -284,6 +305,20 @@ def reorder_topics(topic_ids: List[int], db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────────────────────────────
 # SUBTOPICS
 # ──────────────────────────────────────────────────────────────────────
+
+@router.get("/subtopics", response_model=List[SubtopicResponse])
+def list_all_subtopics(db: Session = Depends(get_db)):
+    """All subtopics of the active roadmap (flat list, used by the frontend)."""
+    roadmap = get_active_roadmap(db)
+    return (
+        db.query(Subtopic)
+        .join(Topic, Subtopic.topic_id == Topic.id)
+        .join(Phase, Topic.phase_id == Phase.id)
+        .filter(Phase.roadmap_id == roadmap.id)
+        .order_by(Topic.id, Subtopic.order)
+        .all()
+    )
+
 
 @router.get("/topics/{topic_id}/subtopics", response_model=List[SubtopicResponse])
 def list_subtopics(topic_id: int, db: Session = Depends(get_db)):
@@ -366,7 +401,7 @@ def reorder_subtopics(subtopic_ids: List[int], db: Session = Depends(get_db)):
     return {"status": "ok"}
 
 
-@router.post("/subtopics/{subtopic_id}/toggle")
+@router.post("/subtopics/{subtopic_id}/toggle", response_model=SubtopicResponse)
 def toggle_subtopic(subtopic_id: int, db: Session = Depends(get_db)):
     """Toggle subtopic done status."""
     subtopic = db.query(Subtopic).filter(Subtopic.id == subtopic_id).first()
@@ -378,10 +413,10 @@ def toggle_subtopic(subtopic_id: int, db: Session = Depends(get_db)):
     else:
         subtopic.done_at = None
     db.commit()
-    db.refresh(subtopic)
     recalc_topic_status(subtopic.topic)
     recalc_phase_status(db, subtopic.topic.phase)
     db.commit()
+    db.refresh(subtopic)
     return subtopic
 
 
@@ -427,6 +462,23 @@ def delete_subtopic_resource(resource_id: int, db: Session = Depends(get_db)):
 # ──────────────────────────────────────────────────────────────────────
 # PROJECTS (GitHub repo linking per phase)
 # ──────────────────────────────────────────────────────────────────────
+
+@router.get("/projects")
+def list_all_projects(phase_id: Optional[int] = None, db: Session = Depends(get_db)):
+    """All projects, optionally filtered by phase."""
+    q = db.query(Project)
+    if phase_id is not None:
+        q = q.filter(Project.phase_id == phase_id)
+    return q.all()
+
+
+@router.get("/projects/{project_id}/checklist")
+def list_checklist_items(project_id: int, db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(404, "Project not found")
+    return project.checklist_items
+
 
 @router.get("/phases/{phase_id}/projects")
 def list_projects(phase_id: int, db: Session = Depends(get_db)):
@@ -786,6 +838,156 @@ def ai_suggest_resources(request: AISuggestResourcesRequest, db: Session = Depen
         return {"resources": resources}
     except Exception as e:
         raise HTTPException(500, f"AI resource suggestion failed: {str(e)}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# AI GENERATION (roadmap completo y proyectos por fase)
+# ──────────────────────────────────────────────────────────────────────
+
+class GenerateRoadmapRequest(BaseModel):
+    career_path: str
+    model: Optional[str] = None
+
+
+@router.post("/generate", response_model=RoadmapResponse)
+def generate_roadmap_ai(request: GenerateRoadmapRequest, db: Session = Depends(get_db)):
+    """Generate a complete roadmap with the active AI provider and activate it."""
+    from app.routers.providers import get_active_provider
+    from app.services.ai import AIServiceError, generate_roadmap_from_scratch
+
+    provider = get_active_provider(db)
+    if not provider:
+        raise HTTPException(400, "No hay un proveedor de IA activo. Configúralo en Config.")
+
+    try:
+        data = generate_roadmap_from_scratch(provider, request.career_path, model=request.model)
+    except AIServiceError as e:
+        raise HTTPException(502, str(e))
+
+    db.query(Roadmap).filter(Roadmap.is_active == True).update({Roadmap.is_active: False})
+    roadmap = Roadmap(
+        title=data.get("title", f"Roadmap: {request.career_path}"),
+        is_active=True,
+        source=RoadmapSource.ai_generated,
+        source_ref=request.career_path[:100],
+    )
+    db.add(roadmap)
+    db.commit()
+    db.refresh(roadmap)
+
+    _persist_parsed_roadmap(db, roadmap, data)
+
+    roadmap = db.query(Roadmap).options(
+        joinedload(Roadmap.phases).joinedload(Phase.topics).joinedload(Topic.subtopics)
+    ).filter(Roadmap.id == roadmap.id).first()
+    return roadmap
+
+
+@router.post("/phases/{phase_id}/generate-project")
+def generate_project_ai(phase_id: int, db: Session = Depends(get_db)):
+    """Generate a practice project (with checklist) for a phase using the AI."""
+    from app.routers.providers import get_active_provider
+    from app.services.ai import AIServiceError, generate_project_for_phase
+
+    phase = db.query(Phase).filter(Phase.id == phase_id).first()
+    if not phase:
+        raise HTTPException(404, "Phase not found")
+
+    provider = get_active_provider(db)
+    if not provider:
+        raise HTTPException(400, "No hay un proveedor de IA activo. Configúralo en Config.")
+
+    try:
+        data = generate_project_for_phase(
+            provider,
+            phase.title,
+            [t.title for t in phase.topics],
+            career_path=phase.roadmap.title if phase.roadmap else "",
+        )
+    except AIServiceError as e:
+        raise HTTPException(502, str(e))
+
+    project = Project(
+        phase_id=phase_id,
+        repo_name=str(data.get("repo_name", "proyecto"))[:200],
+        description=str(data.get("description", ""))[:2000],
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    for label in data.get("checklist", [])[:12]:
+        db.add(ProjectChecklistItem(project_id=project.id, label=str(label)[:200]))
+    db.commit()
+
+    return {
+        "id": project.id,
+        "phase_id": phase_id,
+        "repo_name": project.repo_name,
+        "description": project.description,
+        "checklist": [c.label for c in project.checklist_items],
+    }
+
+
+def _persist_parsed_roadmap(db: Session, roadmap: Roadmap, roadmap_data: Dict[str, Any]) -> None:
+    """Store parsed roadmap data (phases→topics→subtopics→resources) in the DB."""
+    default_cats = [
+        {"slug": "docs", "label": "Documentación", "icon": "📄"},
+        {"slug": "video", "label": "Videos", "icon": "🎬"},
+        {"slug": "lab", "label": "Labs", "icon": "🧪"},
+        {"slug": "article", "label": "Artículos", "icon": "📝"},
+        {"slug": "tool", "label": "Herramientas", "icon": "🔧"},
+        {"slug": "other", "label": "Otros", "icon": "📦"},
+    ]
+    for cat in default_cats:
+        db.add(ResourceCategory(roadmap_id=roadmap.id, **cat))
+    db.commit()
+
+    for phase_idx, phase_data in enumerate(roadmap_data.get("phases", [])):
+        phase = Phase(
+            roadmap_id=roadmap.id,
+            index=phase_idx,
+            title=str(phase_data.get("title", f"Fase {phase_idx + 1}"))[:200],
+            description=str(phase_data.get("description", ""))[:2000],
+            accent=str(phase_data.get("color", "#3fb950"))[:7],
+            status=ItemStatus.todo,
+        )
+        db.add(phase)
+        db.commit()
+        db.refresh(phase)
+
+        for topic_idx, topic_data in enumerate(phase_data.get("topics", [])):
+            topic = Topic(
+                phase_id=phase.id,
+                order=topic_idx,
+                title=str(topic_data.get("title", f"Tema {topic_idx + 1}"))[:300],
+                status=ItemStatus.todo,
+            )
+            db.add(topic)
+            db.commit()
+            db.refresh(topic)
+
+            for sub_idx, sub_data in enumerate(topic_data.get("subtopics", [])):
+                subtopic = Subtopic(
+                    topic_id=topic.id,
+                    order=sub_idx,
+                    title=str(sub_data.get("title", f"Subtema {sub_idx + 1}"))[:400],
+                    done=False,
+                    notes=str(sub_data.get("description", ""))[:2000],
+                )
+                db.add(subtopic)
+                db.commit()
+                db.refresh(subtopic)
+
+                for res in sub_data.get("resources", []):
+                    url = str(res.get("url", ""))[:1000]
+                    if not url:
+                        continue
+                    db.add(SubtopicResource(
+                        subtopic_id=subtopic.id,
+                        label=str(res.get("label", res.get("title", "Recurso")))[:200],
+                        url=url,
+                    ))
+                db.commit()
 
 
 # ──────────────────────────────────────────────────────────────────────

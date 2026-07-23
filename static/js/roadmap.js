@@ -1,6 +1,8 @@
 const Roadmap = (() => {
   'use strict';
 
+  let _subtopics = [];
+
   async function init() {
     await render();
     bindEvents();
@@ -8,15 +10,24 @@ const Roadmap = (() => {
 
   async function render() {
     try {
-      const [phases, topics, subtopics] = await Promise.all([
+      const [phases, topics, subtopics, projects, checklists] = await Promise.all([
         API.getPhases(),
         API.getTopics(),
-        API.getSubtopics()
+        API.getSubtopics(),
+        API.getProjects().catch(() => []),
+        Promise.resolve(null)
       ]);
-      
+
+      // Pre-cargar checklists de todos los proyectos (evita async en templates)
+      const reqsByProject = {};
+      await Promise.all((projects || []).map(async p => {
+        reqsByProject[p.id] = await API.getProjectRequirements(p.id).catch(() => []);
+      }));
+
+      _subtopics = subtopics || [];
       const sortedPhases = phases.sort((a, b) => a.index - b.index);
       renderStrip(sortedPhases, topics);
-      renderSpine(sortedPhases, topics, subtopics);
+      renderSpine(sortedPhases, topics, subtopics, projects || [], reqsByProject);
       App.updateProgress();
     } catch (err) {
       console.error('[Roadmap] Error rendering:', err);
@@ -38,7 +49,7 @@ const Roadmap = (() => {
     }).join('');
   }
 
-  function renderSpine(phases, topics, subtopics) {
+  function renderSpine(phases, topics, subtopics, projects, reqsByProject) {
     const container = document.querySelector('.spine-nodes');
     if (!container) return;
     const allTopics = topics;
@@ -65,47 +76,85 @@ const Roadmap = (() => {
                 const st = subtopics.filter(s => s.topic_id === t.id).sort((a, b) => a.order - b.order);
                 const stDone = st.filter(s => s.done).length;
                 return `
-                <li class="topic${t.status === 'done' ? ' done' : ''}${t.status === 'current' ? ' current' : ''}" data-topic-id="${t.id}">
-                  ${t.title}
-                  ${st.length > 0 ? `<span style="font-size:10px;color:var(--muted)">(${stDone}/${st.length})</span>` : ''}
+                <li class="topic${t.status === 'done' ? ' done' : ''}${t.status === 'current' ? ' current' : ''}">
+                  <span class="topic-label" data-topic-id="${t.id}" style="cursor:pointer">${t.title}</span>
+                  ${st.length > 0 ? `<span class="st-expand" data-expand-topic="${t.id}" style="font-size:10px;color:var(--muted);cursor:pointer;user-select:none"> (${stDone}/${st.length}) ▾</span>` : ''}
+                  <div class="subtopic-container" id="st-container-${t.id}" style="display:none"></div>
                 </li>`;
               }).join('')}
             </ul>
-            ${renderProjects(p.id)}
+            ${renderProjects(p.id, projects, reqsByProject)}
           </div>
         </div>`;
     }).join('');
     bindTopicEvents();
+    bindProjectButtons();
   }
 
-  async function renderProjects(phaseId) {
-    try {
-      const projects = await API.getProjects({ phase_id: phaseId });
-      if (!projects.length) return '';
-      const projectHtml = await Promise.all(projects.map(async p => {
-        const reqs = await API.getProjectRequirements({ project_id: p.id });
-        const done = reqs.filter(r => r.done).length;
-        return `<div style="margin-top:6px;font-size:12px">
-          <span class="tag tag-repo">${p.repo_name}</span>
-          <span style="color:var(--muted)">${done}/${reqs.length}</span>
-        </div>`;
-      }));
-      return `
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-          <strong style="font-size:11px;color:var(--muted)">PROYECTOS</strong>
-          ${projectHtml.join('')}
-        </div>`;
-    } catch (err) {
-      console.error('[Roadmap] Error rendering projects:', err);
-      return '';
-    }
+  function renderProjects(phaseId, projects, reqsByProject) {
+    const phaseProjects = (projects || []).filter(p => p.phase_id === phaseId);
+    const projectHtml = phaseProjects.map(p => {
+      const reqs = (reqsByProject && reqsByProject[p.id]) || [];
+      const done = reqs.filter(r => r.done).length;
+      return `<div style="margin-top:6px;font-size:12px">
+        <span class="tag tag-repo">${p.repo_name}</span>
+        <span style="color:var(--muted)">${done}/${reqs.length}</span>
+      </div>`;
+    }).join('');
+    return `
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <strong style="font-size:11px;color:var(--muted)">PROYECTOS</strong>
+        ${projectHtml || '<span style="font-size:11px;color:var(--muted)"> — ninguno</span>'}
+        <button class="btn-gen-project" data-phase-id="${phaseId}"
+          style="display:block;margin-top:6px;font-size:11px;padding:3px 8px;cursor:pointer;background:transparent;border:1px solid var(--border);border-radius:4px;color:var(--muted)">
+          ✨ Generar proyecto con IA
+        </button>
+      </div>`;
+  }
+
+  function bindProjectButtons() {
+    document.querySelectorAll('.btn-gen-project').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const phaseId = parseInt(btn.dataset.phaseId);
+        btn.textContent = '⏳ Generando...';
+        btn.disabled = true;
+        try {
+          await API.generateProject(phaseId);
+          await render();
+        } catch (err) {
+          btn.textContent = '⚠ ' + (err.message || 'Error');
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   function bindTopicEvents() {
-    document.querySelectorAll('.topic[data-topic-id]').forEach(el => {
+    // Click en el título del tema → ciclo de estado (todo→current→done)
+    document.querySelectorAll('.topic-label[data-topic-id]').forEach(el => {
       el.addEventListener('click', (e) => {
-        const topicId = parseInt(e.currentTarget.dataset.topicId);
+        e.stopPropagation();
+        const topicId = parseInt(el.dataset.topicId);
         toggleTopic(topicId);
+      });
+    });
+    // Click en el contador (x/y) → expandir subtemas con checkboxes
+    document.querySelectorAll('.st-expand[data-expand-topic]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const topicId = parseInt(el.dataset.expandTopic);
+        const container = document.getElementById('st-container-' + topicId);
+        if (!container) return;
+        const visible = container.style.display !== 'none';
+        if (visible) {
+          container.style.display = 'none';
+        } else {
+          if (typeof Subtopics !== 'undefined' && Subtopics.renderForTopic) {
+            Subtopics.renderForTopic(topicId, container, _subtopics);
+          }
+          container.style.display = '';
+        }
       });
     });
   }

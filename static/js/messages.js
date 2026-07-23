@@ -230,7 +230,8 @@ const Messages = (() => {
     const icons = {
       busqueda: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
       info: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
-      agregar: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,vg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
+      agregar: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+      enlace_externo: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
       recursos: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
       sistema: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
       ia: `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
@@ -276,7 +277,8 @@ const Messages = (() => {
     reminder:      { label: 'Recordat.',  icon: 'info',      color: 'yellow',dot: 'dot-yellow' },
     system:        { label: 'Sistema',    icon: 'sistema',   color: 'red',   dot: 'dot-red' },
     ai_suggestion: { label: 'IA Suger.',  icon: 'ia',        color: 'green', dot: 'dot-green' }
-  };r || 'gray'; }
+  };
+  function getCategoryColor(cat) { return CATEGORY_MAP[cat]?.color || 'gray'; }
   function getCategoryIcon(cat) { return CATEGORY_MAP[cat]?.icon || 'info'; }
 
   /* ================================================================
@@ -322,6 +324,8 @@ const Messages = (() => {
         '<div class="mailbox-summary-info">',
           '<span class="mailbox-unread-count"><strong>' + unread + '</strong> mensajes sin leer</span>',
           unread > 0 ? '<button class="btn btn-sm btn-ghost" onclick="Messages.markAllRead()">Marcar todos como leidos</button>' : '',
+          '<button class="btn btn-sm btn-ghost" id="btn-sync-roadmap" onclick="Messages.syncRoadmap(this)" title="Consultar roadmap.sh y avisar si el roadmap cambio">&#128260; Sincronizar roadmap</button>',
+          '<button class="btn btn-sm btn-ghost" id="btn-check-links" onclick="Messages.checkLinks(this)" title="Verificar si los enlaces de los recursos siguen vivos">&#128279; Verificar enlaces</button>',
         '</div>',
       '</div>'
     ].join('');
@@ -421,25 +425,29 @@ const Messages = (() => {
      RENDER: DETALLE DE MENSAJE
      ================================================================ */
   function renderMessageDetail(msgId) {
-    const msg = state.messages.find(m => m.id === msgId);
+    const msg = state.messages.find(m => String(m.id) === String(msgId));
     if (!msg) return '<div class="mail-detail"><p>Mensaje no encontrado.</p></div>';
 
     const kindInfo = KIND_MAP[msg.kind] || KIND_MAP['news'];
     const dateStr = formatExactDate(msg.created_at);
     const tagStyle = kindInfo.color ? 'color:' + kindInfo.color + ';border-color:' + kindInfo.color + '40;background:' + kindInfo.color + '10' : '';
 
+    // Enlace de acción (ej. abrir el roadmap en roadmap.sh o el recurso roto)
+    const actionLink = msg.action_url
+      ? '<a class="btn btn-ghost" href="' + escapeHtml(msg.action_url) + '" target="_blank" rel="noopener noreferrer">Abrir enlace &#8599;</a>'
+      : '';
+
     let actionButtons = '';
     if (msg.requires_auth) {
-      actionButtons = [',
+      actionButtons = [
+        '<div class="mail-actions">',
           '<button class="btn btn-primary" onclick="Messages.approveMessage(\'' + msg.id + '\')">',
             svgIcon('check', 14), ' Aprobar',
           '</button>',
           '<button class="btn btn-ghost" onclick="Messages.rejectMessage(\'' + msg.id + '\')" style="color:var(--red);border-color:rgba(248,81,73,0.3)">',
             svgIcon('x', 14), ' Rechazar',
           '</button>',
-          '<button class="btn btn-ghost" onclick="Messages.suggestAlternative(\'' + msg.id + '\')">',
-            svgIcon('ia', 14), ' Sugerir otra cosa',
-          '</button>',
+          actionLink,
         '</div>'
       ].join('');
     } else {
@@ -449,6 +457,7 @@ const Messages = (() => {
       actionButtons = [
         '<div class="mail-actions">',
           markReadBtn,
+          actionLink,
         '</div>'
       ].join('');
     }
@@ -542,10 +551,10 @@ const Messages = (() => {
      ================================================================ */
   function openMessage(msgId) {
     // Al abrir, marcar como leido automaticamente
-    const idx = state.messages.findIndex(m => m.id === msgId);
+    const idx = state.messages.findIndex(m => String(m.id) === String(msgId));
     if (idx !== -1 && state.messages[idx].status === 'unread') {
       state.messages[idx].status = 'read';
-      try { DB.update('messages', msgId, { status: 'read' }); } catch (e) { /* noop */ }
+      try { API.markMailboxRead(parseInt(msgId)); } catch (e) { /* noop */ }
       updateBadge();
     }
 
@@ -598,10 +607,10 @@ const Messages = (() => {
      ================================================================ */
   function approveMessage(msgId) {
     try {
-      const idx = state.messages.findIndex(m => m.id === msgId);
+      const idx = state.messages.findIndex(m => String(m.id) === String(msgId));
       if (idx === -1) return;
       state.messages[idx].status = 'approved';
-      try { DB.update('messages', msgId, { status: 'approved' }); } catch (e) { /* noop */ }
+      try { API.approveMailboxItem(parseInt(msgId)); } catch (e) { /* noop */ }
       // Simular accion: volver a lista tras breve delay
       backToList();
     } catch (err) {
@@ -611,10 +620,10 @@ const Messages = (() => {
 
   function rejectMessage(msgId) {
     try {
-      const idx = state.messages.findIndex(m => m.id === msgId);
+      const idx = state.messages.findIndex(m => String(m.id) === String(msgId));
       if (idx === -1) return;
       state.messages[idx].status = 'rejected';
-      try { DB.update('messages', msgId, { status: 'rejected' }); } catch (e) { /* noop */ }
+      try { API.rejectMailboxItem(parseInt(msgId)); } catch (e) { /* noop */ }
       backToList();
     } catch (err) {
       console.error('[Messages] rejectMessage error:', err);
@@ -647,10 +656,10 @@ const Messages = (() => {
   function bulkApprove() {
     try {
       state.selection.forEach(msgId => {
-        const idx = state.messages.findIndex(m => m.id === msgId);
+        const idx = state.messages.findIndex(m => String(m.id) === String(msgId));
         if (idx !== -1) {
           state.messages[idx].status = 'approved';
-          try { DB.update('messages', msgId, { status: 'approved' }); } catch (e) { /* noop */ }
+          try { API.approveMailboxItem(parseInt(msgId)); } catch (e) { /* noop */ }
         }
       });
       state.selection.clear();
@@ -663,10 +672,10 @@ const Messages = (() => {
   function bulkReject() {
     try {
       state.selection.forEach(msgId => {
-        const idx = state.messages.findIndex(m => m.id === msgId);
+        const idx = state.messages.findIndex(m => String(m.id) === String(msgId));
         if (idx !== -1) {
           state.messages[idx].status = 'rejected';
-          try { DB.update('messages', msgId, { status: 'rejected' }); } catch (e) { /* noop */ }
+          try { API.rejectMailboxItem(parseInt(msgId)); } catch (e) { /* noop */ }
         }
       });
       state.selection.clear();
@@ -681,11 +690,11 @@ const Messages = (() => {
      ================================================================ */
   function markRead(id) {
     try {
-      const idx = state.messages.findIndex(m => m.id === id);
+      const idx = state.messages.findIndex(m => String(m.id) === String(id));
       if (idx === -1) return;
 
       state.messages[idx].status = 'read';
-      try { DB.update('messages', id, { status: 'read' }); } catch (e) { /* noop */ }
+      try { API.markMailboxRead(parseInt(id)); } catch (e) { /* noop */ }
 
       if (state.viewMode === 'detail') {
         renderMailbox();
@@ -703,7 +712,7 @@ const Messages = (() => {
       state.messages.forEach(m => {
         if (m.status === 'unread') {
           m.status = 'read';
-          try { DB.update('messages', m.id, { status: 'read' }); } catch (e) { /* noop */ }
+          try { API.markMailboxRead(parseInt(m.id)); } catch (e) { /* noop */ }
         }
       });
       state.selection.clear();
@@ -727,20 +736,17 @@ const Messages = (() => {
   /* ================================================================
      CARGA DESDE DB
      ================================================================ */
-  function loadMessages() {
+  async function loadMessages() {
     try {
-      const rows = DB.getAll('messages');
-      if (rows && rows.length > 0) {
-        // Migrar datos v1 a v2 si es necesario
-        state.messages = rows.map(migrateV1toV2);
-      } else {
-        seedIfEmpty();
-        const afterSeed = DB.getAll('messages');
-        state.messages = (afterSeed || []).map(migrateV1toV2);
-      }
+      const rows = await API.getMailbox();
+      state.messages = (rows || []).map(migrateV1toV2);
     } catch (err) {
-      console.warn('[Messages] DB.getAll failed, using seed data in memory:', err);
-      state.messages = MESSAGES_SEED.map(m => ({ ...m }));
+      console.warn('[Messages] backend no disponible, usando datos locales:', err);
+      try {
+        state.messages = (DB.getAll('messages') || []).map(migrateV1toV2);
+      } catch (e) {
+        state.messages = MESSAGES_SEED.map(m => ({ ...m }));
+      }
     }
   }
 
@@ -817,8 +823,7 @@ const Messages = (() => {
       $list  = qs('#messages-list');
       $badge = qs('#msg-badge');
 
-      loadMessages();
-      renderMailbox();
+      loadMessages().then(() => renderMailbox());
       bindEvents();
     } catch (err) {
       console.error('[Messages] init error:', err);
@@ -828,7 +833,43 @@ const Messages = (() => {
   /* ================================================================
      EXPOSE (API publica)
      ================================================================ */
+  async function syncRoadmap(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Sincronizando...'; }
+    try {
+      const res = await API.syncRoadmap();
+      let note;
+      if (!res.synced) note = res.reason || 'No se pudo sincronizar.';
+      else if (res.changed) note = 'El roadmap cambio en el origen. Revisa el aviso nuevo.';
+      else note = 'Sin cambios: el roadmap esta al dia.';
+      await loadMessages();
+      renderMailbox();
+      alert(note);
+    } catch (err) {
+      alert('Error al sincronizar: ' + (err.message || 'desconocido'));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; Sincronizar roadmap'; }
+    }
+  }
+
+  async function checkLinks(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
+    try {
+      const res = await API.checkLinks();
+      await loadMessages();
+      renderMailbox();
+      alert('Enlaces revisados: ' + res.checked + ' — rotos: ' + res.broken +
+            (res.notified ? ' (' + res.notified + ' avisos nuevos)' : ''));
+    } catch (err) {
+      alert('Error verificando enlaces: ' + (err.message || 'desconocido'));
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = '&#128279; Verificar enlaces'; }
+    }
+  }
+
   return {
+    // Sprint 2
+    syncRoadmap,
+    checkLinks,
     // Nuevas funciones v2
     renderMailbox,
     renderMessageList,

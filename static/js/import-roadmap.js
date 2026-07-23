@@ -157,6 +157,26 @@ const ImportRoadmap = (() => {
       $btnImportSH.addEventListener('click', importFromRoadmapSH);
     }
 
+    /* Poblar el select con el catalogo real del backend */
+    if ($selectSH) {
+      API.getShRoadmaps().then(list => {
+        if (!list || !list.length) return;
+        const groups = {};
+        list.forEach(r => {
+          (groups[r.category] = groups[r.category] || []).push(r);
+        });
+        let html = '<option value="">-- Selecciona un roadmap --</option>';
+        Object.entries(groups).forEach(([cat, items]) => {
+          html += '<optgroup label="' + escapeHtml(cat) + '">';
+          items.forEach(r => {
+            html += '<option value="' + escapeHtml(r.id) + '">' + escapeHtml(r.title) + '</option>';
+          });
+          html += '</optgroup>';
+        });
+        $selectSH.innerHTML = html;
+      }).catch(err => console.warn('[Import] No se pudo cargar catalogo:', err));
+    }
+
     /* Clear preview initially */
     renderEmpty();
   }
@@ -309,11 +329,12 @@ const ImportRoadmap = (() => {
   }
 
   /* Save markdown-imported roadmap to DB */
-  function confirmImport(structure) {
+  async function confirmImport(structure) {
     try {
-      const roadmapId = saveStructureToDB(structure);
-      App.navigate('roadmap/' + roadmapId);
+      await saveStructureToDB(structure);
       showSuccess('Roadmap importado correctamente desde Markdown');
+      if (typeof Roadmap !== 'undefined' && Roadmap.render) await Roadmap.render();
+      App.navigate('roadmap');
     } catch (err) {
       showError('Error al guardar: ' + err.message);
     }
@@ -408,13 +429,19 @@ const ImportRoadmap = (() => {
   }
 
   /* Save roadmap.sh structure to DB */
-  function confirmImportSH(structure) {
+  async function confirmImportSH(structure) {
+    const slug = $selectSH ? $selectSH.value : null;
+    if (!slug) { showError('Selecciona un roadmap de la lista'); return; }
+    const $btn = document.getElementById('btn-confirm-import-sh');
+    if ($btn) { $btn.disabled = true; $btn.textContent = 'Importando desde roadmap.sh...'; }
     try {
-      const roadmapId = saveStructureToDB(structure);
-      App.navigate('roadmap/' + roadmapId);
+      await API.importShRoadmap({ roadmap_id: slug, use_ai_enhancement: false });
       showSuccess('Roadmap importado correctamente desde roadmap.sh');
+      if (typeof Roadmap !== 'undefined' && Roadmap.render) await Roadmap.render();
+      App.navigate('roadmap');
     } catch (err) {
-      showError('Error al guardar: ' + err.message);
+      showError('Error al importar: ' + err.message);
+      if ($btn) { $btn.disabled = false; $btn.textContent = 'Confirmar importacion'; }
     }
   }
 
@@ -422,45 +449,26 @@ const ImportRoadmap = (() => {
      SHARED DB HELPERS
      ════════════════════════════════════════════════════════════ */
 
-  function saveStructureToDB(structure) {
-    /* Create roadmap entry */
-    const roadmapId = DB.insert('roadmaps', {
-      title: structure.title,
-      created: Date.now(),
-      updated: Date.now(),
-      source: state.sourceType || 'imported'
-    });
+  async function saveStructureToDB(structure) {
+    /* Crea el roadmap en el backend y lo activa */
+    const roadmap = await API.post('/roadmap/?title=' + encodeURIComponent(structure.title || 'Roadmap importado'));
 
-    /* Create phases and topics */
     let phaseOrder = 0;
     for (const phase of structure.phases) {
-      const phaseId = DB.insert('phases', {
-        roadmap_id: roadmapId,
-        name: phase.name,
-        order: phaseOrder++,
-        created: Date.now()
+      const created = await API.createPhase({
+        index: phaseOrder++,
+        title: phase.name || phase.title || ('Fase ' + phaseOrder),
+        description: '',
+        accent: '#3fb950',
+        status: 'todo'
       });
-
-      let topicOrder = 0;
       for (const topicName of phase.topics) {
-        DB.insert('topics', {
-          phase_id: phaseId,
-          roadmap_id: roadmapId,
-          name: topicName,
-          order: topicOrder++,
-          status: 'pending',
-          notes: '',
-          resources: '',
-          created: Date.now()
-        });
+        await API.createTopic(created.id, { title: String(topicName), status: 'todo' });
       }
     }
 
-    if (typeof App.updateProgress === 'function') {
-      App.updateProgress();
-    }
-
-    return roadmapId;
+    if (typeof App.updateProgress === 'function') App.updateProgress();
+    return roadmap.id;
   }
 
   /* ════════════════════════════════════════════════════════════

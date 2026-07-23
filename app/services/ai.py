@@ -1,61 +1,186 @@
 """
-AI Service Module for Bitácora
-Handles AI-powered resource suggestions, roadmap enhancement, and content generation.
+AI Service Module for Bitácora.
+
+Talks to the configured AIProvider over plain HTTPS (httpx) — no vendor SDKs.
+Supported provider slugs/endpoints:
+  - "anthropic"  → Anthropic Messages API (https://api.anthropic.com/v1/messages)
+  - "ollama" or is_local → OpenAI-compatible chat completions on the local endpoint
+  - anything else → OpenAI-compatible /v1/chat/completions on provider.endpoint
+
+The API key is resolved in this order:
+  1. provider.api_key_encrypted (decrypted with the app's Fernet key)
+  2. the environment variable named by provider.api_key_env_var
 """
+from __future__ import annotations
+
 import json
 import logging
-from typing import List, Dict, Any, Optional
-from sqlalchemy.orm import Session
+import os
+import re
+from typing import Any, Dict, List, Optional
 
-from app.models import AIProvider
-from app.schemas import AIProvider as AIProviderSchema
+import httpx
 
-logger = logging.getLogger(__name__)
+from app.models.base import AIProvider
+from app.utils.security import decrypt_secret
 
+logger = logging.getLogger("bitacora.ai")
 
-def _get_provider_client(provider: AIProvider):
-    """Get the appropriate AI client based on provider type."""
-    if provider.provider_type == "openai":
-        from openai import OpenAI
-        return OpenAI(api_key=provider.api_key, base_url=provider.base_url)
-    elif provider.provider_type == "anthropic":
-        from anthropic import Anthropic
-        return Anthropic(api_key=provider.api_key, base_url=provider.base_url)
-    elif provider.provider_type == "ollama":
-        from openai import OpenAI
-        return OpenAI(api_key="ollama", base_url=provider.base_url or "http://localhost:11434/v1")
-    else:
-        # Default to OpenAI-compatible
-        from openai import OpenAI
-        return OpenAI(api_key=provider.api_key, base_url=provider.base_url)
+DEFAULT_TIMEOUT = 60.0
 
 
-def _call_ai(provider: AIProvider, messages: List[Dict[str, str]], model: Optional[str] = None, **kwargs) -> str:
-    """Call the AI provider with the given messages."""
-    client = _get_provider_client(provider)
-    model_name = model or provider.default_model or "gpt-4o-mini"
-    
-    try:
-        if provider.provider_type == "anthropic":
-            # Anthropic uses a different API format
-            response = client.messages.create(
-                model=model_name,
-                max_tokens=kwargs.get("max_tokens", 4000),
-                messages=messages,
-            )
-            return response.content[0].text
+class AIServiceError(RuntimeError):
+    """Raised when the AI provider call fails in a way the caller should see."""
+
+
+def resolve_api_key(provider: AIProvider) -> Optional[str]:
+    """Resolve the provider's API key without ever exposing it in responses."""
+    if provider.api_key_encrypted:
+        try:
+            return decrypt_secret(provider.api_key_encrypted)
+        except Exception:
+            logger.error("Could not decrypt stored API key for provider %s", provider.slug)
+    if provider.api_key_env_var:
+        return os.environ.get(provider.api_key_env_var)
+    return None
+
+
+def _is_anthropic(provider: AIProvider) -> bool:
+    slug = (provider.slug or "").lower()
+    endpoint = (provider.endpoint or "").lower()
+    return "anthropic" in slug or "anthropic" in endpoint
+
+
+def _split_system(messages: List[Dict[str, str]]) -> tuple[Optional[str], List[Dict[str, str]]]:
+    """Separate the system prompt from the chat turns (Anthropic format)."""
+    system = None
+    turns = []
+    for m in messages:
+        if m.get("role") == "system":
+            system = (system + "\n" + m["content"]) if system else m["content"]
         else:
-            # OpenAI-compatible format
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                max_tokens=kwargs.get("max_tokens", 4000),
-                temperature=kwargs.get("temperature", 0.7),
+            turns.append({"role": m["role"], "content": m["content"]})
+    return system, turns
+
+
+def call_ai(
+    provider: AIProvider,
+    messages: List[Dict[str, str]],
+    model: Optional[str] = None,
+    max_tokens: int = 4000,
+    temperature: float = 0.7,
+) -> str:
+    """Send a chat request to the provider and return the assistant text."""
+    api_key = resolve_api_key(provider)
+    timeout = float(provider.timeout_seconds or DEFAULT_TIMEOUT)
+
+    if _is_anthropic(provider):
+        if not api_key:
+            raise AIServiceError(
+                "El proveedor Anthropic no tiene API key configurada "
+                "(agrega la clave o define la variable de entorno)."
             )
-            return response.choices[0].message.content
-    except Exception as e:
-        logger.error(f"AI call failed: {e}")
-        raise
+        model_name = model or provider.default_model or "claude-sonnet-5"
+        url = (provider.endpoint or "https://api.anthropic.com").rstrip("/")
+        if not url.endswith("/v1/messages"):
+            url = url + "/v1/messages"
+        system, turns = _split_system(messages)
+        payload: Dict[str, Any] = {
+            "model": model_name,
+            "max_tokens": max_tokens,
+            "messages": turns,
+        }
+        if system:
+            payload["system"] = system
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                resp = client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+            parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
+            return "".join(parts)
+        except httpx.HTTPStatusError as e:
+            detail = e.response.text[:300]
+            logger.error("Anthropic call failed (%s): %s", e.response.status_code, detail)
+            raise AIServiceError(f"Proveedor Anthropic respondió {e.response.status_code}.") from e
+        except httpx.HTTPError as e:
+            raise AIServiceError(f"No se pudo contactar al proveedor: {e}") from e
+
+    # OpenAI-compatible (OpenAI, Ollama, LM Studio, etc.)
+    base = (provider.endpoint or "").rstrip("/")
+    if not base:
+        base = "http://localhost:11434/v1" if provider.is_local else "https://api.openai.com/v1"
+    url = base + ("/chat/completions" if not base.endswith("/chat/completions") else "")
+    model_name = model or provider.default_model or ("llama3" if provider.is_local else "gpt-4o-mini")
+    headers = {"content-type": "application/json"}
+    if api_key:
+        headers["authorization"] = f"Bearer {api_key}"
+    elif not provider.is_local:
+        raise AIServiceError(
+            f"El proveedor {provider.name} no tiene API key configurada."
+        )
+    payload = {
+        "model": model_name,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        return data["choices"][0]["message"]["content"]
+    except httpx.HTTPStatusError as e:
+        logger.error("AI call failed (%s): %s", e.response.status_code, e.response.text[:300])
+        raise AIServiceError(f"El proveedor respondió {e.response.status_code}.") from e
+    except (httpx.HTTPError, KeyError, IndexError) as e:
+        raise AIServiceError(f"No se pudo obtener respuesta del proveedor: {e}") from e
+
+
+# Backwards-compatible alias used by roadmap.py
+_call_ai = call_ai
+
+
+def _extract_json(text: str) -> Any:
+    """Parse JSON out of an AI reply, tolerating markdown fences."""
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    # Last resort: slice from first { or [ to matching end
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=-1)
+        if start == -1:
+            raise
+        return json.loads(text[start:])
+
+
+def chat_reply(
+    provider: AIProvider,
+    history: List[Dict[str, str]],
+    user_message: str,
+    context: Optional[str] = None,
+) -> str:
+    """Conversational reply for the Bitácora chat (the AI professor)."""
+    system = (
+        "Eres el profesor y mentor de Bitácora, una plataforma personal de aprendizaje. "
+        "Ayudas al estudiante con su roadmap de aprendizaje: explicas temas, recomiendas "
+        "recursos, propones ejercicios y proyectos, y respondes en español de forma clara "
+        "y motivadora. Sé concreto y práctico."
+    )
+    if context:
+        system += f"\n\nContexto actual del estudiante:\n{context}"
+    messages: List[Dict[str, str]] = [{"role": "system", "content": system}]
+    messages.extend(history[-20:])
+    messages.append({"role": "user", "content": user_message})
+    return call_ai(provider, messages, max_tokens=1500)
 
 
 def generate_resource_suggestions(
@@ -65,97 +190,40 @@ def generate_resource_suggestions(
     topic_titles: List[str],
     model: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """
-    Generate AI-powered resource suggestions for a career path and roadmap structure.
-    
-    Returns a list of resource objects with:
-    - title: Resource title
-    - url: Resource URL
-    - category: Resource category (docs, video, lab, article, tool, other)
-    - description: Brief description
-    - phase: Related phase title
-    - topic: Related topic title
-    """
-    
-    system_prompt = """You are an expert career coach and technical curriculum designer. 
-Your task is to suggest high-quality learning resources for a specific career path and roadmap structure.
-
-For each resource, provide:
-1. title - Clear, descriptive title
-2. url - Direct link to the resource (official docs, tutorials, courses, videos, etc.)
-3. category - One of: docs, video, lab, article, tool, other
-4. description - 1-2 sentence description of what the resource covers
-5. phase - The phase title this resource relates to
-6. topic - The topic title this resource relates to
-
-Focus on:
-- Official documentation and tutorials
-- High-quality free resources (YouTube channels, free courses, articles)
-- Hands-on labs and interactive tutorials
-- Industry-standard tools and platforms
-- Resources that are current and actively maintained
-
-Return ONLY a valid JSON array of resource objects. No markdown, no extra text."""
-
-    # Build context about the roadmap structure
-    roadmap_context = f"Career Path: {career_path}\n\n"
-    roadmap_context += "Roadmap Structure:\n"
-    for i, phase in enumerate(phase_titles):
-        roadmap_context += f"  Phase {i+1}: {phase}\n"
-        # Find topics for this phase
-        phase_topics = [t for t in topic_titles if t.startswith(f"{phase}") or True]  # Simplified
-        for topic in topic_titles[:5]:  # Limit to avoid token overflow
-            roadmap_context += f"    - {topic}\n"
-
-    user_prompt = f"""{roadmap_context}
-
-Generate 15-20 high-quality learning resources tailored to this career path and roadmap structure.
-Distribute resources across the phases and topics.
-Prioritize official documentation, free high-quality tutorials, and hands-on labs.
-Return ONLY a JSON array."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    """AI-suggested learning resources for a career path + roadmap structure."""
+    system_prompt = (
+        "You are an expert technical curriculum designer. Suggest high-quality, real, "
+        "currently-maintained learning resources (official docs, free courses, videos, labs). "
+        'Return ONLY a JSON array of objects with keys: "title", "url", "category" '
+        '(docs|video|lab|article|tool|other), "description", "phase", "topic".'
+    )
+    ctx = f"Career path: {career_path}\nPhases: {', '.join(phase_titles[:10])}\n"
+    ctx += f"Topics: {', '.join(topic_titles[:25])}"
+    user_prompt = ctx + "\n\nGenerate 12-18 resources distributed across these phases/topics. JSON array only."
 
     try:
-        response = _call_ai(provider, messages, model, max_tokens=4000, temperature=0.7)
-        
-        # Parse JSON response
-        # Clean up potential markdown code blocks
-        response = response.strip()
-        if response.startswith("```json"):
-            response = response[7:]
-        if response.startswith("```"):
-            response = response[3:]
-        if response.endswith("```"):
-            response = response[:-3]
-        
-        resources = json.loads(response.strip())
-        
-        # Validate and normalize resources
-        validated_resources = []
-        for r in resources:
-            if isinstance(r, dict) and "title" in r and "url" in r:
-                validated_resources.append({
-                    "title": r.get("title", ""),
-                    "url": r.get("url", ""),
+        raw = call_ai(
+            provider,
+            [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            model=model,
+            max_tokens=4000,
+        )
+        items = _extract_json(raw)
+        out = []
+        for r in items if isinstance(items, list) else []:
+            if isinstance(r, dict) and r.get("title") and r.get("url"):
+                out.append({
+                    "title": str(r.get("title"))[:300],
+                    "url": str(r.get("url"))[:1000],
                     "category": r.get("category", "article"),
-                    "description": r.get("description", ""),
+                    "description": str(r.get("description", ""))[:500],
                     "phase": r.get("phase", ""),
                     "topic": r.get("topic", ""),
                 })
-        
-        return validated_resources
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse AI response as JSON: {e}")
-        logger.error(f"Response: {response[:500]}")
-        return _get_fallback_resources(career_path, phase_titles, topic_titles)
-    except Exception as e:
-        logger.error(f"AI resource suggestion failed: {e}")
-        return _get_fallback_resources(career_path, phase_titles, topic_titles)
+        return out
+    except (AIServiceError, json.JSONDecodeError) as e:
+        logger.error("AI resource suggestion failed: %s", e)
+        return []
 
 
 def enhance_roadmap_with_ai(
@@ -163,63 +231,28 @@ def enhance_roadmap_with_ai(
     roadmap_data: Dict[str, Any],
     career_path: str,
 ) -> Dict[str, Any]:
-    """
-    Enhance roadmap data with AI-generated content based on career path.
-    Adds more specific topics, subtopics, and resources tailored to the career.
-    """
-    
-    system_prompt = """You are an expert career coach and technical curriculum designer.
-Your task is to enhance a roadmap with more specific, career-tailored content.
-
-Given a roadmap structure and a career path, enhance it by:
-1. Adding more specific subtopics to existing topics
-2. Adding relevant resources (with URLs) to subtopics
-3. Optionally adding new topics to phases if they're missing key areas for the career
-
-Return the enhanced roadmap in the SAME JSON format as input.
-Only add content - don't remove or restructure existing content.
-Focus on practical, industry-relevant skills and current technologies.
-
-Return ONLY valid JSON. No markdown, no extra text."""
-
-    user_prompt = f"""Career Path: {career_path}
-
-Current Roadmap:
-{json.dumps(roadmap_data, indent=2)}
-
-Enhance this roadmap for a {career_path} career. Add:
-- More specific subtopics with practical focus
-- High-quality resource URLs (official docs, tutorials, courses)
-- Career-specific tools and technologies
-- Current industry best practices
-
-Return the enhanced roadmap in the same JSON format."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
+    """Enrich a parsed roadmap with career-specific subtopics/resources."""
+    system_prompt = (
+        "You are an expert curriculum designer. Enhance the given roadmap JSON for the "
+        "career path: add specific subtopics and resource URLs. Keep the exact same JSON "
+        "structure; only add content. Return ONLY valid JSON."
+    )
+    user_prompt = (
+        f"Career path: {career_path}\n\nRoadmap:\n{json.dumps(roadmap_data, ensure_ascii=False)[:12000]}"
+        "\n\nReturn the enhanced roadmap JSON."
+    )
     try:
-        response = _call_ai(provider, messages, max_tokens=6000, temperature=0.7)
-        
-        # Clean up response
-        response = response.strip()
-        if response.startswith("```json"):
-            response = response[7:]
-        if response.startswith("```"):
-            response = response[3:]
-        if response.endswith("```"):
-            response = response[:-3]
-        
-        enhanced = json.loads(response.strip())
-        return enhanced
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse AI enhancement response: {e}")
+        raw = call_ai(
+            provider,
+            [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            max_tokens=6000,
+        )
+        enhanced = _extract_json(raw)
+        if isinstance(enhanced, dict) and enhanced.get("phases"):
+            return enhanced
         return roadmap_data
-    except Exception as e:
-        logger.error(f"AI roadmap enhancement failed: {e}")
+    except (AIServiceError, json.JSONDecodeError) as e:
+        logger.error("AI roadmap enhancement failed: %s", e)
         return roadmap_data
 
 
@@ -228,154 +261,52 @@ def generate_roadmap_from_scratch(
     career_path: str,
     model: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Generate a complete roadmap from scratch for a given career path.
-    """
-    
-    system_prompt = """You are an expert career coach and technical curriculum designer.
-Generate a comprehensive, structured roadmap for a specific career path.
-
-The roadmap should have:
-- 4-6 phases (Fundamentals, Core Skills, Advanced, Specialization, Career Growth)
-- Each phase has 3-5 topics
-- Each topic has 3-5 subtopics
-- Each subtopic has 2-4 relevant resources with URLs
-
-Format as JSON:
-{
-  "title": "Career Path Roadmap",
-  "description": "Brief description",
-  "phases": [
-    {
-      "title": "Phase Name",
-      "description": "Phase description",
-      "color": "#hexcolor",
-      "topics": [
-        {
-          "title": "Topic Name",
-          "description": "Topic description",
-          "subtopics": [
-            {
-              "title": "Subtopic Name",
-              "description": "Subtopic description",
-              "resources": [
-                {"label": "Resource Name", "url": "https://..."}
-              ]
-            }
-          ]
-        }
-      ]
-    }
-  ]
-}
-
-Focus on:
-- Current industry standards and technologies
-- Practical, hands-on skills
-- Official documentation and high-quality free resources
-- Progressive learning path from beginner to advanced
-- Career-specific tools and platforms
-
-Return ONLY valid JSON. No markdown, no extra text."""
-
-    user_prompt = f"""Generate a comprehensive roadmap for: {career_path}
-
-Create a structured learning path from beginner to job-ready professional.
-Include current technologies, tools, and best practices for 2024-2025.
-Prioritize official documentation, free high-quality courses, and hands-on labs."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
-    try:
-        response = _call_ai(provider, messages, model, max_tokens=8000, temperature=0.7)
-        
-        response = response.strip()
-        if response.startswith("```json"):
-            response = response[7:]
-        if response.startswith("```"):
-            response = response[3:]
-        if response.endswith("```"):
-            response = response[:-3]
-        
-        roadmap = json.loads(response.strip())
-        return roadmap
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse AI roadmap generation: {e}")
-        return _get_fallback_roadmap(career_path)
-    except Exception as e:
-        logger.error(f"AI roadmap generation failed: {e}")
-        return _get_fallback_roadmap(career_path)
+    """Generate a full roadmap (phases → topics → subtopics → resources) for a career."""
+    system_prompt = (
+        "You are an expert curriculum designer. Generate a complete learning roadmap as JSON:\n"
+        '{"title": str, "description": str, "phases": [{"title": str, "description": str, '
+        '"color": "#hex", "topics": [{"title": str, "subtopics": [{"title": str, '
+        '"description": str, "resources": [{"label": str, "url": str}]}]}]}]}\n'
+        "4-6 phases, 3-5 topics each, 2-4 subtopics per topic, 1-3 real resource URLs per "
+        "subtopic (official docs, free courses). Titles in Spanish where natural. "
+        "Return ONLY valid JSON."
+    )
+    user_prompt = f"Generate the roadmap for the career path: {career_path}"
+    raw = call_ai(
+        provider,
+        [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+        model=model,
+        max_tokens=8000,
+    )
+    data = _extract_json(raw)
+    if not isinstance(data, dict) or not data.get("phases"):
+        raise AIServiceError("La IA no devolvió un roadmap válido.")
+    return data
 
 
-def _get_fallback_resources(career_path: str, phase_titles: List[str], topic_titles: List[str]) -> List[Dict[str, Any]]:
-    """Fallback resources when AI fails."""
-    return [
-        {
-            "title": f"Official {career_path} Documentation",
-            "url": "https://docs.example.com",
-            "category": "docs",
-            "description": "Official documentation and guides",
-            "phase": phase_titles[0] if phase_titles else "Fundamentals",
-            "topic": topic_titles[0] if topic_titles else "Getting Started",
-        },
-        {
-            "title": f"{career_path} Tutorial - FreeCodeCamp",
-            "url": "https://freecodecamp.org",
-            "category": "video",
-            "description": "Free comprehensive video course",
-            "phase": phase_titles[0] if phase_titles else "Fundamentals",
-            "topic": topic_titles[0] if topic_titles else "Getting Started",
-        },
-        {
-            "title": f"{career_path} Hands-on Labs",
-            "url": "https://github.com",
-            "category": "lab",
-            "description": "Practice projects and exercises",
-            "phase": phase_titles[1] if len(phase_titles) > 1 else "Core Skills",
-            "topic": topic_titles[1] if len(topic_titles) > 1 else "Practice",
-        },
-    ]
-
-
-def _get_fallback_roadmap(career_path: str) -> Dict[str, Any]:
-    """Fallback roadmap when AI generation fails."""
-    return {
-        "title": f"{career_path} Roadmap",
-        "description": f"Learning path for {career_path}",
-        "phases": [
-            {
-                "title": "Fundamentals",
-                "description": "Core concepts and basics",
-                "color": "#3fb950",
-                "topics": [
-                    {
-                        "title": "Getting Started",
-                        "description": "Introduction and setup",
-                        "subtopics": [
-                            {"title": "Environment Setup", "description": "Install tools and configure environment", "resources": []},
-                            {"title": "Hello World", "description": "First steps and basic syntax", "resources": []},
-                        ]
-                    }
-                ]
-            },
-            {
-                "title": "Core Skills",
-                "description": "Essential skills for the career",
-                "color": "#61dafb",
-                "topics": [
-                    {
-                        "title": "Core Concepts",
-                        "description": "Fundamental concepts",
-                        "subtopics": [
-                            {"title": "Concept 1", "description": "Description", "resources": []},
-                            {"title": "Concept 2", "description": "Description", "resources": []},
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
+def generate_project_for_phase(
+    provider: AIProvider,
+    phase_title: str,
+    topic_titles: List[str],
+    career_path: str = "",
+) -> Dict[str, Any]:
+    """Generate a practice project (with checklist) for a roadmap phase."""
+    system_prompt = (
+        "You are a mentor who designs hands-on practice projects. Return ONLY JSON: "
+        '{"repo_name": str (kebab-case, short), "description": str (2-3 sentences, Spanish), '
+        '"checklist": [str, ...] (5-8 concrete steps, Spanish)}'
+    )
+    user_prompt = (
+        f"Career: {career_path or 'software developer'}\nPhase: {phase_title}\n"
+        f"Topics: {', '.join(topic_titles[:10])}\n\nDesign one practical project that "
+        "exercises these topics."
+    )
+    raw = call_ai(
+        provider,
+        [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+        max_tokens=1200,
+    )
+    data = _extract_json(raw)
+    if not isinstance(data, dict) or not data.get("repo_name"):
+        raise AIServiceError("La IA no devolvió un proyecto válido.")
+    return data

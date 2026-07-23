@@ -9,36 +9,109 @@ const Config = (() => {
     renderActions();
   }
 
-  function renderProviders() {
+  async function renderProviders() {
     const container = document.getElementById('config-providers');
     if (!container) return;
-    const providers = DB.getAll('ai_providers');
+    let providers = [];
+    try { providers = await API.getAIProviders(); } catch (e) { console.error('[Config]', e); }
+
+    const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+
     container.innerHTML = providers.map(p => `
       <div class="panel" style="margin-bottom:10px">
         <div class="panel-body">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <strong>${p.name}</strong>
-            <span class="tag${p.is_active ? ' tag-green' : ''}">${p.is_active ? 'Activo' : 'Inactivo'}</span>
+            <strong>${esc(p.name)}</strong>
+            <span>
+              ${p.has_api_key ? '<span class="tag">&#128273; clave guardada</span>' : ''}
+              <span class="tag${p.is_active ? ' tag-green' : ''}">${p.is_active ? 'Activo' : 'Inactivo'}</span>
+            </span>
           </div>
           <div style="font-size:12px;color:var(--muted)">
-            <div>Endpoint: ${p.endpoint}</div>
-            <div>Modelo: ${p.default_model}</div>
+            <div>Endpoint: ${esc(p.endpoint || '(por defecto)')}</div>
+            <div>Modelo: ${esc(p.default_model || '(por defecto)')}</div>
           </div>
-          <div style="display:flex;gap:8px;margin-top:10px">
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
             <button class="btn btn-primary btn-sm" data-action="activate" data-id="${p.id}">Activar</button>
-            <button class="btn btn-ghost btn-sm" data-action="test" data-id="${p.id}">Probar</button>
+            <button class="btn btn-ghost btn-sm" data-action="key" data-id="${p.id}">Guardar clave</button>
+            <button class="btn btn-danger btn-sm" data-action="delete" data-id="${p.id}">Eliminar</button>
           </div>
         </div>
       </div>
-    `).join('');
+    `).join('') + `
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-body">
+          <strong style="display:block;margin-bottom:10px">Agregar proveedor</strong>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <select id="new-prov-preset" class="select">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="ollama">Ollama (local, sin clave)</option>
+            </select>
+            <input id="new-prov-model" class="input" placeholder="Modelo (ej. claude-sonnet-5 / gpt-4o-mini / llama3)">
+            <input id="new-prov-key" class="input" type="password" placeholder="Clave API (se guarda cifrada en el servidor)">
+            <button class="btn btn-primary btn-sm" id="btn-add-provider">Agregar</button>
+          </div>
+        </div>
+      </div>`;
+
     container.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.action;
         const id = parseInt(btn.dataset.id);
         if (action === 'activate') activateProvider(id);
-        else if (action === 'test') testProvider(id);
+        else if (action === 'key') saveProviderKey(id);
+        else if (action === 'delete') deleteProvider(id);
       });
     });
+
+    document.getElementById('btn-add-provider')?.addEventListener('click', addProvider);
+  }
+
+  const PROVIDER_PRESETS = {
+    anthropic: { name: 'Anthropic', slug: 'anthropic', endpoint: 'https://api.anthropic.com', default_model: 'claude-sonnet-5', is_local: false },
+    openai:    { name: 'OpenAI',    slug: 'openai',    endpoint: 'https://api.openai.com/v1', default_model: 'gpt-4o-mini', is_local: false },
+    ollama:    { name: 'Ollama',    slug: 'ollama',    endpoint: 'http://localhost:11434/v1', default_model: 'llama3', is_local: true }
+  };
+
+  async function addProvider() {
+    const preset = PROVIDER_PRESETS[document.getElementById('new-prov-preset').value];
+    const model = document.getElementById('new-prov-model').value.trim();
+    const key = document.getElementById('new-prov-key').value.trim();
+    try {
+      const payload = { ...preset };
+      if (model) payload.default_model = model;
+      if (key) payload.api_key = key;
+      // slug único por si se repite
+      payload.slug = payload.slug + '-' + Date.now().toString(36);
+      const created = await API.createAIProvider(payload);
+      await API.setActiveAIProvider(created.id);
+      await renderProviders();
+    } catch (err) {
+      alert('No se pudo agregar: ' + (err.message || 'error'));
+    }
+  }
+
+  async function saveProviderKey(id) {
+    const key = prompt('Pega la clave API (se guardara cifrada en el servidor):');
+    if (!key) return;
+    try {
+      await API.request('/providers/' + id, { method: 'PATCH', body: { api_key: key.trim() } });
+      alert('Clave guardada cifrada.');
+      await renderProviders();
+    } catch (err) {
+      alert('Error: ' + (err.message || 'no se pudo guardar'));
+    }
+  }
+
+  async function deleteProvider(id) {
+    if (!confirm('Eliminar este proveedor?')) return;
+    try {
+      await API.deleteAIProvider(id);
+      await renderProviders();
+    } catch (err) {
+      alert('Error: ' + (err.message || 'no se pudo eliminar'));
+    }
   }
 
   function renderAppearance() {
@@ -106,17 +179,13 @@ const Config = (() => {
     document.getElementById('btn-reset')?.addEventListener('click', resetData);
   }
 
-  function activateProvider(id) {
-    const providers = DB.getAll('ai_providers');
-    providers.forEach(p => {
-      DB.update('ai_providers', p.id, { is_active: p.id === id });
-    });
-    renderProviders();
-  }
-
-  function testProvider(id) {
-    const p = DB.getById('ai_providers', id);
-    alert('Probar conexion con ' + (p ? p.name : 'proveedor') + '\n(Pendiente: implementar prueba real)');
+  async function activateProvider(id) {
+    try {
+      await API.setActiveAIProvider(id);
+      await renderProviders();
+    } catch (err) {
+      alert('Error al activar: ' + (err.message || 'error'));
+    }
   }
 
   function toggleTheme() {

@@ -71,9 +71,24 @@ def delete_resource(
     return {"ok": True}
 
 
-@router.get("/queue", response_model=list[dict])
+@router.get("/queue")
 def list_queue(db: Session = Depends(get_db)):
-    return db.query(ResourceQueue).all()
+    items = db.query(ResourceQueue).order_by(ResourceQueue.created_at.desc()).all()
+    return [
+        {
+            "id": i.id,
+            "title": i.title,
+            "url": i.url,
+            "description": i.description,
+            "category_slug": i.category_slug,
+            "rationale": i.rationale,
+            "found_by": i.found_by,
+            "status": i.status.value if hasattr(i.status, "value") else i.status,
+            "created_at": i.created_at.isoformat() if i.created_at else None,
+            "reviewed_at": i.reviewed_at.isoformat() if i.reviewed_at else None,
+        }
+        for i in items
+    ]
 
 
 @router.post("/queue/approve/{qid}")
@@ -97,3 +112,66 @@ def approve_queue_item(
     item.reviewed_at = datetime.utcnow()
     db.commit()
     return {"ok": True, "resource_id": r.id}
+
+
+@router.post("/queue/reject/{qid}")
+def reject_queue_item(qid: int, db: Session = Depends(get_db)):
+    from datetime import datetime
+    item = db.query(ResourceQueue).filter(ResourceQueue.id == qid).first()
+    if not item:
+        raise HTTPException(404, "Queue item not found")
+    item.status = "rejected"
+    item.reviewed_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/queue/{qid}")
+def delete_queue_item(qid: int, db: Session = Depends(get_db)):
+    item = db.query(ResourceQueue).filter(ResourceQueue.id == qid).first()
+    if not item:
+        raise HTTPException(404, "Queue item not found")
+    db.delete(item)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/discover")
+def discover_resources(
+    q: str,
+    max_results: int = 8,
+    save_to_queue: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Search the internet for learning resources about a topic.
+
+    Real web search (DuckDuckGo). Optionally stores results in the approval
+    queue (skipping URLs already queued or in the library).
+    """
+    from app.services.websearch import search_learning_resources
+
+    q = validate_search_query(q)
+    if not q:
+        raise HTTPException(400, "Consulta de búsqueda vacía o inválida")
+
+    results = search_learning_resources(q, max_results=min(max_results, 20))
+
+    queued = 0
+    if save_to_queue and results:
+        existing_urls = {u for (u,) in db.query(ResourceQueue.url).all()}
+        existing_urls |= {u for (u,) in db.query(Resource.url).all()}
+        for r in results:
+            if r["url"] in existing_urls:
+                continue
+            db.add(ResourceQueue(
+                title=r["title"],
+                url=r["url"],
+                description=r.get("snippet", ""),
+                rationale=f"Encontrado buscando: {q}",
+                found_by="websearch",
+                status="pending",
+            ))
+            queued += 1
+        db.commit()
+
+    return {"query": q, "results": results, "queued": queued}

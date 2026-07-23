@@ -104,7 +104,7 @@ const Resources = (() => {
 
   /* ---------- Selección de elementos del DOM ---------- */
   const ensureDOM = () => {
-    $container = document.getElementById('recursos');
+    $container = document.getElementById('view-recursos') || document.getElementById('recursos');
     if (!$container) return false;
     $filterBar = $container.querySelector('.filter-bar');
     $searchInput = $container.querySelector('.search-field');
@@ -439,18 +439,14 @@ const Resources = (() => {
 
   /* ---------- Archivar recurso ---------- */
   const archiveResource = async (id) => {
-    if (!confirm('¿Archivar este recurso? Seguirá disponible pero oculto.')) return;
+    if (!confirm('¿Eliminar este recurso de la biblioteca?')) return;
     try {
-      const updated = await API.updateResource(id, {
-        status: 'archived',
-        updated_at: nowISO()
-      });
-      if (updated) {
-        await loadResources();
-        render();
-      }
+      await API.deleteResource(id);
+      await loadResources();
+      render();
     } catch (err) {
-      console.error('[Resources] Error archiving resource:', err);
+      console.error('[Resources] Error deleting resource:', err);
+      alert('No se pudo eliminar: ' + (err.message || 'error'));
     }
   };
 

@@ -108,47 +108,36 @@ const LinkChecker = (() => {
    */
   async function verifyAll() {
     if (_isRunning) {
-      console.warn('[LinkChecker] Ya hay una verificacion en curso. Cancela primero.');
-      return;
-    }
-
-    const resources = DB.getAll('resources').filter(r => r.status === 'active' && r.url);
-    if (resources.length === 0) {
-      _showSummary({ ok: 0, redirect: 0, broken: 0, unknown: 0, total: 0 });
+      console.warn('[LinkChecker] Ya hay una verificacion en curso.');
       return;
     }
 
     _isRunning = true;
-    _abortController = new AbortController();
-    _hostLastRequest = {};
-
-    const stats = { ok: 0, redirect: 0, broken: 0, unknown: 0, total: resources.length };
-    let processed = 0;
-
-    _showProgress(processed, stats.total, 'Iniciando verificacion...');
+    _showProgress(0, 1, 'Verificando enlaces en el servidor...');
 
     try {
-      /* Procesar en lotes de MAX_CONCURRENT */
-      for (let i = 0; i < resources.length; i += MAX_CONCURRENT) {
-        if (_abortController.signal.aborted) {
-          console.log('[LinkChecker] Verificacion cancelada por el usuario.');
-          break;
-        }
-
-        const batch = resources.slice(i, i + MAX_CONCURRENT);
-        const promises = batch.map(r => _verifyOneWithProgress(r, stats, () => {
-          processed++;
-          _showProgress(processed, stats.total, `${processed}/${stats.total} verificados`);
-        }));
-
-        await Promise.all(promises);
+      /* El backend hace la verificacion real (sin limites CORS del navegador)
+         y ademas crea avisos en el buzon para enlaces rotos nuevos. */
+      const res = await API.checkLinks();
+      const stats = {
+        ok: Math.max(0, (res.checked || 0) - (res.broken || 0) - (res.redirects || 0)),
+        redirect: res.redirects || 0,
+        broken: res.broken || 0,
+        unknown: 0,
+        total: res.checked || 0
+      };
+      _showProgress(1, 1, `${stats.total} enlaces verificados`);
+      _showSummary(stats);
+      /* Refrescar la vista de recursos con los estados nuevos */
+      if (typeof Resources !== 'undefined' && Resources.render) {
+        const resources = await API.getResources().catch(() => null);
+        if (resources) Resources.render(resources);
       }
     } catch (err) {
       console.error('[LinkChecker] Error en verifyAll():', err);
+      _showSummary({ ok: 0, redirect: 0, broken: 0, unknown: 0, total: 0 });
     } finally {
       _isRunning = false;
-      _abortController = null;
-      _showSummary(stats);
     }
   }
 

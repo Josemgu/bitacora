@@ -56,129 +56,47 @@ const Discover = (() => {
    * @returns {Promise<{queued: number, rejected: number, errors: number}>}
    */
   async function search(phaseId, maxResults = 10) {
-    /* 1. Obtener fase y temas */
-    const phase = DB.getById('phases', phaseId);
-    if (!phase) {
-      console.error('[Discover] Fase no encontrada:', phaseId);
-      return { queued: 0, rejected: 0, errors: 0 };
+    /* 1. Obtener fase y temas desde el backend */
+    let phase, topicTitles;
+    try {
+      const phases = await API.getPhases();
+      phase = phases.find(p => p.id === phaseId);
+      if (!phase) {
+        console.error('[Discover] Fase no encontrada:', phaseId);
+        return { queued: 0, rejected: 0, errors: 1 };
+      }
+      topicTitles = (phase.topics || []).map(t => t.title);
+    } catch (err) {
+      console.error('[Discover] Error cargando fase:', err);
+      return { queued: 0, rejected: 0, errors: 1 };
     }
-
-    const allTopics = DB.getAll('topics');
-    const phaseTopics = allTopics.filter(t => t.phase_id === phaseId);
-    const topicTitles = phaseTopics.map(t => t.title);
-
-    console.log(`[Discover] Buscando recursos para fase "${phase.title}" (${topicTitles.length} temas)`);
 
     /* 2. Armar query */
     const query = buildQuery(phase, topicTitles);
     console.log('[Discover] Query:', query);
+    renderProgress(1, 3, `Buscando en internet: "${_esc(query)}"...`);
 
-    renderProgress(0, maxResults, `Buscando: "${query}"...`);
-
-    /* 3. Ejecutar busqueda (API real o simulada) */
-    let candidates;
+    /* 3. Búsqueda REAL en internet (el backend busca y encola) */
     try {
-      candidates = await _executeSearch(query, maxResults, phase, topicTitles);
+      const res = await API.discoverResources(query, { max_results: maxResults });
+      const found = (res.results || []).length;
+      const stats = {
+        queued: res.queued || 0,
+        rejected: Math.max(0, found - (res.queued || 0)),
+        errors: 0,
+        results: res.results || []
+      };
+      renderProgress(3, 3,
+        `Completado: ${found} encontrados, ${stats.queued} añadidos a la cola`);
+      _showSearchSummary(phase, stats);
+      if (typeof Queue !== 'undefined' && Queue.renderBadge) Queue.renderBadge();
+      console.log('[Discover] Resumen:', stats);
+      return stats;
     } catch (err) {
       console.error('[Discover] Error en busqueda:', err);
-      renderProgress(0, maxResults, 'Error en la busqueda');
+      renderProgress(0, 3, 'Error: ' + (err.message || 'fallo la busqueda'));
       return { queued: 0, rejected: 0, errors: 1 };
     }
-
-    console.log(`[Discover] ${candidates.length} candidatos encontrados`);
-
-    /* 4. Evaluar, filtrar duplicados, verificar y encolar */
-    let processed = 0;
-    const stats = { queued: 0, rejected: 0, errors: 0 };
-
-    for (const candidate of candidates) {
-      processed++;
-      renderProgress(processed, candidates.length,
-        `Evaluando ${processed}/${candidates.length}: ${_esc(candidate.title || '...')}`);
-
-      try {
-        /* 4a. Evaluar con IA */
-        const evaluation = await evaluateCandidate(candidate, phase, topicTitles);
-        if (!evaluation) {
-          stats.rejected++;
-          continue;
-        }
-
-        /* 4b. Verificar duplicado */
-        if (isDuplicate(candidate.url)) {
-          console.log('[Discover] Duplicado descartado:', candidate.url);
-          stats.rejected++;
-          continue;
-        }
-
-        /* 4c. Verificar link (no bloqueante) */
-        let linkStatus = 'unknown';
-        let httpCode = null;
-        if (typeof LinkChecker !== 'undefined' && LinkChecker.canCheckUrl(candidate.url)) {
-          try {
-            const checkResult = await LinkChecker.verifyOne;
-            /* No podemos llamar verifyOne directamente sin resourceId.
-               Hacemos un check basico: */
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            const response = await fetch(candidate.url, {
-              method: 'HEAD',
-              mode: 'no-cors',
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            linkStatus = 'ok';
-          } catch {
-            linkStatus = 'unknown';
-          }
-        }
-
-        /* 4d. Encolar */
-        const queueItem = {
-          title: evaluation.titulo || candidate.title || 'Sin titulo',
-          url: candidate.url,
-          description: evaluation.descripcion || candidate.snippet || '',
-          category: VALID_CATEGORIES.includes(evaluation.categoria) ? evaluation.categoria : 'blog',
-          category_suggested: evaluation.categoria || 'blog',
-          phase: phase.index,
-          phase_suggested: phase.index,
-          reason: evaluation.razon || '',
-          confidence: evaluation.confianza || 0.5,
-          model: 'Discover-IA',
-          status: 'pending',
-          link_status: linkStatus,
-          link_http_code: httpCode,
-          found_by: 'discover'
-        };
-
-        const inserted = addToQueue(queueItem, phase.index, 'discover');
-        if (inserted) {
-          stats.queued++;
-          console.log('[Discover] Encolado:', queueItem.title);
-        } else {
-          stats.errors++;
-        }
-
-      } catch (err) {
-        console.error('[Discover] Error procesando candidato:', err);
-        stats.errors++;
-      }
-    }
-
-    /* 5. Finalizar */
-    renderProgress(candidates.length, candidates.length,
-      `Completado: ${stats.queued} encolados, ${stats.rejected} descartados`);
-
-    /* Mostrar resumen */
-    _showSearchSummary(phase, stats);
-
-    /* Actualizar badge de cola */
-    if (typeof Queue !== 'undefined' && Queue.renderBadge) {
-      Queue.renderBadge();
-    }
-
-    console.log('[Discover] Resumen:', stats);
-    return stats;
   }
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -703,7 +621,7 @@ Reglas:
   /**
    * Renderiza el dialogo/modal de busqueda de recursos.
    */
-  function renderSearchDialog() {
+  async function renderSearchDialog() {
     const modalId = 'modal-discover';
     let $modal = document.getElementById(modalId);
     if ($modal) {
@@ -711,8 +629,9 @@ Reglas:
       return;
     }
 
-    /* Obtener fases para el select */
-    const phases = DB.getAll('phases');
+    /* Obtener fases del backend para el select */
+    let phases = [];
+    try { phases = await API.getPhases(); } catch (e) { console.error('[Discover]', e); }
     const currentPhase = phases.find(p => p.status === 'current') || phases[0];
 
     $modal = document.createElement('div');
@@ -772,8 +691,9 @@ Reglas:
 
     const updatePreview = () => {
       const phaseId = parseInt($phaseSelect.value, 10);
-      const phase = DB.getById('phases', phaseId);
-      const topics = DB.getAll('topics').filter(t => t.phase_id === phaseId).map(t => t.title);
+      const phase = phases.find(p => p.id === phaseId);
+      if (!phase) { $queryPreview.innerHTML = ''; return; }
+      const topics = (phase.topics || []).map(t => t.title);
       const query = buildQuery(phase, topics);
       $queryPreview.innerHTML = `<small class="text-muted">Query: <code>${_esc(query)}</code></small>`;
     };

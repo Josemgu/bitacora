@@ -64,6 +64,28 @@ def create_provider(
     return _to_response(p)
 
 
+@router.patch("/{pid}", response_model=AIProviderResponse)
+def update_provider(
+    pid: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Update provider fields. Accepts api_key (stored encrypted, never returned)."""
+    p = db.query(AIProvider).filter(AIProvider.id == pid).first()
+    if not p:
+        raise HTTPException(404, "Provider not found")
+    allowed = {"name", "endpoint", "default_model", "is_local", "api_key_env_var", "is_instructor"}
+    for field, value in data.items():
+        if field in allowed:
+            setattr(p, field, value)
+    if data.get("api_key"):
+        p.api_key_encrypted = encrypt_secret(str(data["api_key"]))
+    db.commit()
+    db.refresh(p)
+    return _to_response(p)
+
+
 @router.patch("/{pid}/activate")
 def activate_provider(
     pid: int,

@@ -78,7 +78,7 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
 
 # ─── Routers ───
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(roadmap.router, prefix="/api/roadmaps", tags=["Roadmaps"])
+app.include_router(roadmap.router, prefix="/api", tags=["Roadmaps"])
 app.include_router(resources.router, prefix="/api/resources", tags=["Resources"])
 app.include_router(mailbox.router, prefix="/api/mailbox", tags=["Mailbox"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])

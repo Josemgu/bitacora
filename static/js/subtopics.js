@@ -1,43 +1,26 @@
 const Subtopics = (() => {
   'use strict';
 
-  function toggle(subtopicId) {
-    const st = DB.getById('subtopics', subtopicId);
-    if (!st) return;
-    st.done = !st.done;
-    st.done_at = st.done ? new Date().toISOString() : null;
-    DB.update('subtopics', subtopicId, st);
-
-    const topic = DB.getById('topics', st.topic_id);
-    const siblings = DB.query('subtopics', s => s.topic_id === st.topic_id);
-    const allDone = siblings.every(s => s.done);
-    const someDone = siblings.some(s => s.done);
-
-    let newStatus = 'todo';
-    if (allDone) newStatus = 'done';
-    else if (someDone) newStatus = 'current';
-
-    if (topic.status !== newStatus) {
-      DB.update('topics', topic.id, { status: newStatus });
-      const phase = DB.getById('phases', topic.phase_id);
-      const phaseTopics = DB.query('topics', t => t.phase_id === phase.id);
-      const phaseAllDone = phaseTopics.every(t => t.status === 'done');
-      const phaseSomeDone = phaseTopics.some(t => t.status === 'done' || t.status === 'current');
-      let phaseStatus = 'todo';
-      if (phaseAllDone) phaseStatus = 'done';
-      else if (phaseSomeDone) phaseStatus = 'current';
-      DB.update('phases', phase.id, { status: phaseStatus });
+  /**
+   * Marca/desmarca un subtema. El backend recalcula automáticamente el
+   * estado del tema y de la fase (done/current/todo).
+   */
+  async function toggle(subtopicId) {
+    try {
+      await API.toggleSubtopic(subtopicId);
+      if (typeof Roadmap !== 'undefined' && Roadmap.render) await Roadmap.render();
+      if (typeof App !== 'undefined' && App.updateProgress) App.updateProgress();
+    } catch (err) {
+      console.error('[Subtopics] Error al marcar subtema:', err);
     }
-
-    Roadmap.render();
-    App.updateProgress();
   }
 
-  function renderForTopic(topicId, container) {
-    const subtopics = DB.query('subtopics', s => s.topic_id === topicId).sort((a, b) => a.order - b.order);
-    if (!subtopics.length) return;
+  function renderForTopic(topicId, container, subtopics) {
+    const list = (subtopics || []).filter(s => s.topic_id === topicId)
+      .sort((a, b) => a.order - b.order);
+    if (!list.length) return;
 
-    const html = subtopics.map(st => `
+    const html = list.map(st => `
       <label class="subtopic-item" data-id="${st.id}">
         <input type="checkbox" ${st.done ? 'checked' : ''} data-subtopic-id="${st.id}">
         <span class="subtopic-title${st.done ? ' done' : ''}">${st.title}</span>
