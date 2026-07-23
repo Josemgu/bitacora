@@ -193,6 +193,8 @@ class MailboxItemBase(BaseModel):
     body: str
     related_id: Optional[int] = None
     requires_auth: bool = False
+    is_actionable: bool = False
+    action_url: Optional[str] = None
     status: str = "unread"
 
 

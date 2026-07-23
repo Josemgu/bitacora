@@ -13,8 +13,9 @@ from app.database import get_db
 from app.models.base import (
     Phase, Topic, Subtopic, Roadmap, ItemStatus, Project, ProjectChecklistItem,
     ResourceCategory, Resource, ResourceOrigin, LinkStatus,
-    SubtopicResource, ProjectStatus,
+    SubtopicResource, ProjectStatus, RoadmapSource, AIProvider,
 )
+from app.services.auth import require_instructor
 from app.schemas import (
     RoadmapResponse,
     PhaseCreate, PhaseResponse, PhaseBase,
@@ -624,7 +625,11 @@ def list_roadmap_sh_roadmaps():
 
 
 @router.post("/sh/import", response_model=RoadmapResponse)
-def import_roadmap_sh(request: RoadmapShImportRequest, db: Session = Depends(get_db)):
+def import_roadmap_sh(
+    request: RoadmapShImportRequest,
+    db: Session = Depends(get_db),
+    _=Depends(require_instructor),
+):
     """
     Import a roadmap from roadmap.sh into Bitácora.
     Fetches the roadmap data, optionally enhances with AI, and creates phases/topics/subtopics.
@@ -661,8 +666,16 @@ def import_roadmap_sh(request: RoadmapShImportRequest, db: Session = Depends(get
     roadmap = Roadmap(
         title=roadmap_data.get("title", f"roadmap.sh - {request.roadmap_id}"),
         is_active=True,
-        source="roadmap.sh",
+        source=RoadmapSource.roadmapsh,
         source_ref=request.roadmap_id,
+    )
+    # Fingerprint the imported structure so future syncs can detect upstream
+    # changes (Sprint 2).
+    from app.services.roadmap_sync import compute_structure_hash, summarize_structure
+    roadmap.version_hash = compute_structure_hash(roadmap_data)
+    roadmap.last_sync_at = datetime.utcnow()
+    roadmap.source_metadata = json.dumps(
+        {"summary": summarize_structure(roadmap_data)}, ensure_ascii=False
     )
     db.add(roadmap)
     db.commit()
@@ -773,6 +786,47 @@ def ai_suggest_resources(request: AISuggestResourcesRequest, db: Session = Depen
         return {"resources": resources}
     except Exception as e:
         raise HTTPException(500, f"AI resource suggestion failed: {str(e)}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# SYNC & CHANGE NOTIFICATIONS (Sprint 2)
+# ──────────────────────────────────────────────────────────────────────
+
+@router.post("/sh/sync")
+def sync_roadmap(
+    roadmap_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    _=Depends(require_instructor),
+):
+    """Check a roadmap.sh-sourced roadmap for upstream changes and notify.
+
+    Without ``roadmap_id`` the active roadmap is used. Creates a mailbox
+    ``roadmap_update`` item when the upstream structure changed.
+    """
+    from app.services.roadmap_sync import sync_roadmap_from_source
+
+    if roadmap_id is not None:
+        roadmap = db.query(Roadmap).filter(Roadmap.id == roadmap_id).first()
+        if not roadmap:
+            raise HTTPException(404, "Roadmap not found")
+    else:
+        roadmap = get_active_roadmap(db)
+
+    result = sync_roadmap_from_source(db, roadmap, parser=_parse_roadmap_sh_html)
+    return result
+
+
+@router.post("/links/check")
+def check_roadmap_links(
+    limit: int = Query(200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    _=Depends(require_instructor),
+):
+    """Probe resource links, update their status, and notify on newly-broken
+    links. Returns a summary of how many were checked/broken/redirected."""
+    from app.services.roadmap_sync import check_links
+
+    return check_links(db, limit=limit)
 
 
 def _parse_roadmap_sh_html(html_content: str, roadmap_id: str) -> Optional[Dict[str, Any]]:
