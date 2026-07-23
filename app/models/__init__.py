@@ -4,6 +4,7 @@ from .base import (
     Project, ProjectChecklistItem,
     MailboxItem, ScheduleEntry, DailyNote,
     ChatMessage, UserProfile, AIProvider,
+    User, UserRole,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "Project", "ProjectChecklistItem",
     "MailboxItem", "ScheduleEntry", "DailyNote",
     "ChatMessage", "UserProfile", "AIProvider",
+    "User", "UserRole",
 ]

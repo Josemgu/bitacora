@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.base import Resource, ResourceCategory, ResourceQueue, LinkStatus
+from app.models.base import Resource, ResourceCategory, ResourceQueue, LinkStatus, User
 from app.schemas import ResourceCreate, ResourceResponse
+from app.services.auth import require_admin
+from app.utils.validators import validate_search_query
 
 router = APIRouter()
 
@@ -28,9 +30,10 @@ def list_resources(
         query = query.filter(Resource.is_lab == is_lab)
     if is_tutorial is not None:
         query = query.filter(Resource.is_tutorial == is_tutorial)
+    q = validate_search_query(q)
     if q:
         query = query.filter(Resource.title.ilike(f"%{q}%"))
-    return query.all()
+    return query.limit(500).all()
 
 
 @router.post("", response_model=ResourceResponse)
@@ -55,7 +58,11 @@ def update_link_status(rid: int, status: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{rid}")
-def delete_resource(rid: int, db: Session = Depends(get_db)):
+def delete_resource(
+    rid: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
     r = db.query(Resource).filter(Resource.id == rid).first()
     if not r:
         raise HTTPException(404, "Resource not found")
@@ -70,7 +77,11 @@ def list_queue(db: Session = Depends(get_db)):
 
 
 @router.post("/queue/approve/{qid}")
-def approve_queue_item(qid: int, db: Session = Depends(get_db)):
+def approve_queue_item(
+    qid: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
     item = db.query(ResourceQueue).filter(ResourceQueue.id == qid).first()
     if not item:
         raise HTTPException(404, "Queue item not found")
