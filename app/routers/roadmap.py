@@ -2,9 +2,10 @@
 Roadmap router — Full CRUD for 3-level roadmap (phases → topics → subtopics).
 """
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -21,6 +22,7 @@ from app.schemas import (
     SubtopicResourceBase, SubtopicResourceResponse,
     ProjectCreate, ProjectResponse, ProjectBase,
     ProjectChecklistItemBase, ProjectChecklistItemResponse,
+    RoadmapResponse,
 )
 
 router = APIRouter(tags=["roadmap"])
