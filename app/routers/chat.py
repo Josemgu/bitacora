@@ -3,7 +3,7 @@ Chat router — message history and AI streaming.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -11,17 +11,20 @@ from sqlalchemy import desc
 from app.database import get_db
 from app.models.base import ChatMessage
 from app.schemas import ChatMessageCreate, ChatMessageResponse
+from backend.security.rate_limit import limiter, ai_limit, standard_limit
 
 router = APIRouter()
 
 
 @router.get("/messages", response_model=list[ChatMessageResponse])
-def list_messages(limit: int = 100, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def list_messages(request: Request, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(ChatMessage).order_by(desc(ChatMessage.created_at)).limit(limit).all()
 
 
 @router.post("/messages", response_model=ChatMessageResponse)
-def create_message(data: ChatMessageCreate, db: Session = Depends(get_db)):
+@limiter.limit(ai_limit)
+def create_message(request: Request, data: ChatMessageCreate, db: Session = Depends(get_db)):
     msg = ChatMessage(**data.model_dump())
     db.add(msg)
     db.commit()
@@ -30,7 +33,8 @@ def create_message(data: ChatMessageCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/chat")
-def chat_stream(data: ChatMessageCreate):
+@limiter.limit(ai_limit)
+def chat_stream(request: Request, data: ChatMessageCreate):
     async def _stream():
         response_text = (
             "Hola! Soy tu asistente de Bitacora. "
@@ -43,7 +47,9 @@ def chat_stream(data: ChatMessageCreate):
 
 
 @router.delete("/messages")
-def clear_history(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def clear_history(request: Request, db: Session = Depends(get_db)):
     db.query(ChatMessage).delete()
     db.commit()
     return {"ok": True}
+

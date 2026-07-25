@@ -3,19 +3,22 @@ Mailbox router — unified inbox (news, resources, broken links, reminders, sugg
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from app.database import get_db
 from app.models.base import MailboxItem, MailboxStatus, MailboxKind
 from app.schemas import MailboxItemCreate, MailboxItemResponse
+from backend.security.rate_limit import limiter, standard_limit
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[MailboxItemResponse])
+@limiter.limit(standard_limit)
 def list_items(
+    request: Request,
     kind: str | None = None,
     status: str | None = None,
     db: Session = Depends(get_db)
@@ -29,7 +32,8 @@ def list_items(
 
 
 @router.post("", response_model=MailboxItemResponse)
-def create_item(data: MailboxItemCreate, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def create_item(request: Request, data: MailboxItemCreate, db: Session = Depends(get_db)):
     item = MailboxItem(**data.model_dump())
     db.add(item)
     db.commit()
@@ -38,7 +42,8 @@ def create_item(data: MailboxItemCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{mid}/read")
-def mark_read(mid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def mark_read(request: Request, mid: int, db: Session = Depends(get_db)):
     item = db.query(MailboxItem).filter(MailboxItem.id == mid).first()
     if not item:
         raise HTTPException(404, "Item not found")
@@ -48,7 +53,8 @@ def mark_read(mid: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{mid}/approve")
-def approve_item(mid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def approve_item(request: Request, mid: int, db: Session = Depends(get_db)):
     item = db.query(MailboxItem).filter(MailboxItem.id == mid).first()
     if not item:
         raise HTTPException(404, "Item not found")
@@ -58,7 +64,8 @@ def approve_item(mid: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{mid}/reject")
-def reject_item(mid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def reject_item(request: Request, mid: int, db: Session = Depends(get_db)):
     item = db.query(MailboxItem).filter(MailboxItem.id == mid).first()
     if not item:
         raise HTTPException(404, "Item not found")
@@ -68,7 +75,8 @@ def reject_item(mid: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{mid}/dismiss")
-def dismiss_item(mid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def dismiss_item(request: Request, mid: int, db: Session = Depends(get_db)):
     item = db.query(MailboxItem).filter(MailboxItem.id == mid).first()
     if not item:
         raise HTTPException(404, "Item not found")
@@ -78,8 +86,10 @@ def dismiss_item(mid: int, db: Session = Depends(get_db)):
 
 
 @router.get("/stats/unread")
-def unread_count(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def unread_count(request: Request, db: Session = Depends(get_db)):
     count = db.query(MailboxItem).filter(
         MailboxItem.status == MailboxStatus.unread
     ).count()
     return {"unread": count}
+

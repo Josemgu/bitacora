@@ -3,18 +3,21 @@ Resources router — CRUD for the resource library.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.base import Resource, ResourceCategory, ResourceQueue, LinkStatus
 from app.schemas import ResourceCreate, ResourceResponse
+from backend.security.rate_limit import limiter, standard_limit
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[ResourceResponse])
+@limiter.limit(standard_limit)
 def list_resources(
+    request: Request,
     category_id: int | None = None,
     is_lab: bool | None = None,
     is_tutorial: bool | None = None,
@@ -34,7 +37,8 @@ def list_resources(
 
 
 @router.post("", response_model=ResourceResponse)
-def create_resource(data: ResourceCreate, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def create_resource(request: Request, data: ResourceCreate, db: Session = Depends(get_db)):
     r = Resource(**data.model_dump())
     db.add(r)
     db.commit()
@@ -43,7 +47,8 @@ def create_resource(data: ResourceCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{rid}/link-status")
-def update_link_status(rid: int, status: str, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def update_link_status(request: Request, rid: int, status: str, db: Session = Depends(get_db)):
     from datetime import datetime
     r = db.query(Resource).filter(Resource.id == rid).first()
     if not r:
@@ -55,7 +60,8 @@ def update_link_status(rid: int, status: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{rid}")
-def delete_resource(rid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def delete_resource(request: Request, rid: int, db: Session = Depends(get_db)):
     r = db.query(Resource).filter(Resource.id == rid).first()
     if not r:
         raise HTTPException(404, "Resource not found")
@@ -65,12 +71,14 @@ def delete_resource(rid: int, db: Session = Depends(get_db)):
 
 
 @router.get("/queue", response_model=list[dict])
-def list_queue(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def list_queue(request: Request, db: Session = Depends(get_db)):
     return db.query(ResourceQueue).all()
 
 
 @router.post("/queue/approve/{qid}")
-def approve_queue_item(qid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def approve_queue_item(request: Request, qid: int, db: Session = Depends(get_db)):
     item = db.query(ResourceQueue).filter(ResourceQueue.id == qid).first()
     if not item:
         raise HTTPException(404, "Queue item not found")
@@ -86,3 +94,4 @@ def approve_queue_item(qid: int, db: Session = Depends(get_db)):
     item.reviewed_at = datetime.utcnow()
     db.commit()
     return {"ok": True, "resource_id": r.id}
+

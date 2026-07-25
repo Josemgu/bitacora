@@ -5,7 +5,7 @@ Per-provider mode: cloud (hosted API) or local (self-hosted/Ollama).
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config import get_settings, BitacoraMode
@@ -13,12 +13,14 @@ from app.database import get_db
 from app.models.base import AIProvider, ProviderMode
 from app.schemas import AIProviderBase, AIProviderResponse
 from app.security import encrypt_api_key, decrypt_api_key
+from backend.security.rate_limit import limiter, ai_limit, standard_limit
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[AIProviderResponse])
-def list_providers(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def list_providers(request: Request, db: Session = Depends(get_db)):
     providers = db.query(AIProvider).all()
     settings = get_settings()
     
@@ -30,7 +32,8 @@ def list_providers(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=AIProviderResponse)
-def create_provider(data: AIProviderBase, db: Session = Depends(get_db)):
+@limiter.limit(ai_limit)
+def create_provider(request: Request, data: AIProviderBase, db: Session = Depends(get_db)):
     settings = get_settings()
     
     # In selfhost mode, we don't store API keys on server
@@ -48,7 +51,7 @@ def create_provider(data: AIProviderBase, db: Session = Depends(get_db)):
         provider_data.pop("api_key", None)
         provider_data["api_key_encrypted"] = None
         provider_data["encryption_version"] = None
-    
+
     p = AIProvider(**provider_data)
     db.add(p)
     db.commit()
@@ -61,7 +64,8 @@ def create_provider(data: AIProviderBase, db: Session = Depends(get_db)):
 
 
 @router.patch("/{pid}/activate")
-def activate_provider(pid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def activate_provider(request: Request, pid: int, db: Session = Depends(get_db)):
     db.query(AIProvider).update({AIProvider.is_active: False})
     p = db.query(AIProvider).filter(AIProvider.id == pid).first()
     if not p:
@@ -72,7 +76,8 @@ def activate_provider(pid: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{pid}")
-def delete_provider(pid: int, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def delete_provider(request: Request, pid: int, db: Session = Depends(get_db)):
     p = db.query(AIProvider).filter(AIProvider.id == pid).first()
     if not p:
         raise HTTPException(404, "Provider not found")
@@ -82,14 +87,15 @@ def delete_provider(pid: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{pid}/test")
-def test_provider(pid: int, db: Session = Depends(get_db)):
+@limiter.limit(ai_limit)
+def test_provider(request: Request, pid: int, db: Session = Depends(get_db)):
     """Test if a provider is configured correctly."""
     p = db.query(AIProvider).filter(AIProvider.id == pid).first()
     if not p:
         raise HTTPException(404, "Provider not found")
-    
-    settings = get_settings()
-    
+
+        provider_data.pop("api_key", None)
+
     if settings.BITACORA_MODE == BitacoraMode.SELF_HOST:
         # In selfhost mode, the key should come from the frontend
         # This endpoint just validates the provider config
@@ -103,7 +109,7 @@ def test_provider(pid: int, db: Session = Depends(get_db)):
         # In hosted mode, decrypt and test the key
         if not p.api_key_encrypted:
             raise HTTPException(400, "No API key configured for this provider")
-        
+
         try:
             api_key = decrypt_api_key(p.api_key_encrypted)
             # Here we could make a test call to the provider
@@ -116,17 +122,17 @@ def test_provider(pid: int, db: Session = Depends(get_db)):
         except Exception as e:
             raise HTTPException(400, f"Failed to decrypt API key: {str(e)}")
 
-
 @router.patch("/{pid}", response_model=AIProviderResponse)
-def update_provider(pid: int, data: AIProviderBase, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def update_provider(request: Request, pid: int, data: AIProviderBase, db: Session = Depends(get_db)):
     """Update an AI provider with dual-mode support."""
     p = db.query(AIProvider).filter(AIProvider.id == pid).first()
     if not p:
         raise HTTPException(404, "Provider not found")
-    
+
     settings = get_settings()
     provider_data = data.model_dump(exclude_unset=True)
-    
+
     if settings.BITACORA_MODE == BitacoraMode.HOSTED:
         # Hosted mode: encrypt and store API key if provided
         api_key = provider_data.pop("api_key", None)
@@ -138,13 +144,13 @@ def update_provider(pid: int, data: AIProviderBase, db: Session = Depends(get_db
         provider_data.pop("api_key", None)
         provider_data["api_key_encrypted"] = None
         provider_data["encryption_version"] = None
-    
+
     for key, value in provider_data.items():
         setattr(p, key, value)
-    
+
     db.commit()
     db.refresh(p)
-    
+
     # Don't return encrypted key in response for selfhost mode
     if settings.BITACORA_MODE == BitacoraMode.SELF_HOST:
         p.api_key_encrypted = None
@@ -154,3 +160,4 @@ def update_provider(pid: int, data: AIProviderBase, db: Session = Depends(get_db
 def get_active_provider(db: Session) -> AIProvider | None:
     """Get the currently active AI provider."""
     return db.query(AIProvider).filter(AIProvider.is_active == True).first()
+

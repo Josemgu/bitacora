@@ -3,12 +3,13 @@ User profile router — single-user app profile management.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.base import UserProfile
 from app.schemas import UserProfileBase, UserProfileResponse
+from backend.security.rate_limit import limiter, standard_limit
 
 
 class ProfileConfigBase(UserProfileBase):
@@ -18,7 +19,8 @@ router = APIRouter()
 
 
 @router.get("", response_model=UserProfileResponse)
-def get_profile(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def get_profile(request: Request, db: Session = Depends(get_db)):
     profile = db.query(UserProfile).first()
     if not profile:
         profile = UserProfile()
@@ -29,7 +31,8 @@ def get_profile(db: Session = Depends(get_db)):
 
 
 @router.put("", response_model=UserProfileResponse)
-def update_profile(data: UserProfileBase, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def update_profile(request: Request, data: UserProfileBase, db: Session = Depends(get_db)):
     profile = db.query(UserProfile).first()
     if not profile:
         profile = UserProfile(**data.model_dump())
@@ -43,7 +46,8 @@ def update_profile(data: UserProfileBase, db: Session = Depends(get_db)):
 
 
 @router.get("/config", response_model=UserProfileResponse)
-def get_profile_config(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def get_profile_config(request: Request, db: Session = Depends(get_db)):
     profile = db.query(UserProfile).first()
     if not profile:
         profile = UserProfile()
@@ -54,7 +58,8 @@ def get_profile_config(db: Session = Depends(get_db)):
 
 
 @router.put("/config", response_model=UserProfileResponse)
-def update_profile_config(data: ProfileConfigBase, db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def update_profile_config(request: Request, data: ProfileConfigBase, db: Session = Depends(get_db)):
     profile = db.query(UserProfile).first()
     if not profile:
         profile = UserProfile(**data.model_dump())
@@ -65,3 +70,4 @@ def update_profile_config(data: ProfileConfigBase, db: Session = Depends(get_db)
     db.commit()
     db.refresh(profile)
     return profile
+

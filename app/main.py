@@ -6,10 +6,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import get_settings, get_bitacora_mode
 from app.database import init_db, get_db
@@ -17,6 +21,7 @@ from app.routers import (
     roadmap, resources, mailbox, chat, profile, providers, health
 )
 from app.services.seed import seed_if_empty
+from backend.security.rate_limit import limiter
 
 # ─── Paths ───
 BASE_DIR = Path(__file__).resolve().parent
@@ -31,6 +36,11 @@ app = FastAPI(
     description="Backend para Bitácora v2 — Learning OS",
     version="2.0.0",
 )
+
+# ─── Rate Limiting (B3) ───
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 
 @app.middleware("http")
@@ -82,3 +92,4 @@ def startup():
         seed_if_empty(db)
     finally:
         db.close()
+

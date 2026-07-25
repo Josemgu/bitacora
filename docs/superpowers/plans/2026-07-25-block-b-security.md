@@ -18,6 +18,7 @@
 - Treat all external HTML, uploaded files, and AI-adjacent inputs as hostile until validated.
 - Use tests or executable checks as the proof gate before moving to the next function.
 - Do not start B6 until B1-B5 are closed and verified.
+- Ninguna sección de "Execution Notes" o documentación de progreso puede afirmar en prosa libre que algo "ya existe", "ya está integrado" o "ya se creó". Todo estado de avance se registra ÚNICAMENTE como checkbox (`[ ]` o `[x]`), nunca como oración afirmativa suelta. Si hace falta explicar contexto alrededor de un checkbox, la explicación no debe contener por sí sola una afirmación de estado verificable sin el checkbox al lado. (Regla añadida 2026-07-25 tras auditoría de seguridad: aplica también a los planes de Bloques C, D, E, F que se documenten en el futuro.)
 
 ---
 
@@ -633,7 +634,8 @@ git commit -m "docs: record block b execution plan status"
 
 ## Execution Notes
 
-- B2 intentionally creates `app/services/scraping.py` as a seam even though Scrapling is not integrated yet; this satisfies the spec without forcing a broader feature build.
+- ~~B2 intentionally creates `app/services/scraping.py` as a seam even though Scrapling is not integrated yet; this satisfies the spec without forcing a broader feature build.~~
+  **CORRECTION (2026-07-25, security audit):** this note was inaccurate. `app/services/scraping.py` was never created, and no scraping seam exists. B2 only delivered `backend/security/inputs.py` (`sanitize_rich_text()`, `secure_image_upload()`), with zero callers outside their own tests. The seam remains pending until Block D (Scrapling) is actually built.
 - B4 extends the existing `app/security.py` because creating `app/security/crypto.py` would conflict with the current module path.
 - B5 should rely on environment flags; local deployment at `http://127.0.0.1:8000` must keep working.
 - B6 is out of scope for implementation until Task 6 is verified.

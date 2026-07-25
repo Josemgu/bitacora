@@ -4,7 +4,7 @@ Health check and dashboard stats.
 from __future__ import annotations
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 
@@ -14,12 +14,14 @@ from app.models.base import (
     MailboxItem, MailboxStatus, ItemStatus
 )
 from app.schemas import HealthResponse, DashboardStats
+from backend.security.rate_limit import limiter, standard_limit
 
 router = APIRouter()
 
 
 @router.get("/health", response_model=HealthResponse)
-def health_check(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def health_check(request: Request, db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         return HealthResponse(status="ok", db="connected", timestamp=datetime.utcnow())
@@ -28,7 +30,8 @@ def health_check(db: Session = Depends(get_db)):
 
 
 @router.get("/stats", response_model=DashboardStats)
-def dashboard_stats(db: Session = Depends(get_db)):
+@limiter.limit(standard_limit)
+def dashboard_stats(request: Request, db: Session = Depends(get_db)):
     total_phases = db.query(Phase).count()
     done_phases = db.query(Phase).filter(Phase.status == ItemStatus.done).count()
     total_topics = db.query(Topic).count()
@@ -50,3 +53,4 @@ def dashboard_stats(db: Session = Depends(get_db)):
         active_providers=active_providers,
         unread_mailbox=unread_mailbox,
     )
+
