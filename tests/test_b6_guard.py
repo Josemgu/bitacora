@@ -10,7 +10,7 @@ def test_ai_guard_masks_secrets_and_sql_hallucinations() -> None:
     leaked = """
     Resultado de auditoria universitaria:
     api_key: mock_key_dummy_placeholder_xyz987654
-    token fallback: neutral_token_placeholder_123456789
+    token: neutral_token_placeholder_123456789
     ```sql
     SELECT email, password_hash FROM students WHERE is_admin = 1;
     ```
