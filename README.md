@@ -2,7 +2,17 @@
 
 Bitácora es una plataforma de aprendizaje guiada por IA para construir roadmaps técnicos, consumir recursos confiables y practicar con laboratorios reales desde una experiencia web simple y modular.
 
+> Estado actual: proyecto en desarrollo activo. La base del Bloque A y la integración inicial de proveedores ya están funcionando, pero el endurecimiento completo de seguridad y varias capas de producto siguen en construcción.
+
 ![Hero](docs/images/bitacora-hero.svg)
+
+## Preview
+
+Estas vistas muestran el estado actual de la aplicación en esta etapa del desarrollo:
+
+![Hero visual de Bitácora](docs/images/bitacora-hero.svg)
+
+![Flujo de proveedores y conexión](docs/images/bitacora-providers.svg)
 
 ## Qué hemos construido
 
@@ -34,6 +44,12 @@ Hasta este punto, el proyecto ya incluye:
 - cierre de la capa de seguridad del Bloque B
 - validación adicional de entrada y sanitización de datos externos
 - hardening de rate limiting y protección API
+
+### 🚧 En desarrollo
+
+- despliegue de seguridad de nivel producción para el Bloque B
+- validaciones más estrictas para entrada externa y archivos
+- más pruebas de integración y endurecimiento operativo
 
 ## Inicio rápido
 
