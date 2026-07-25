@@ -9,8 +9,8 @@ from backend.security.ai_guard import validate_ai_output
 def test_ai_guard_masks_secrets_and_sql_hallucinations() -> None:
     leaked = """
     Resultado de auditoria universitaria:
-    API_KEY=sk-campus-prod-1234567890ABCDEF
-    Token fallback: ghp_1234567890abcdef1234567890abcdef1234
+    api_key: mock_key_dummy_placeholder_xyz987654
+    token fallback: neutral_token_placeholder_123456789
     ```sql
     SELECT email, password_hash FROM students WHERE is_admin = 1;
     ```
@@ -18,8 +18,8 @@ def test_ai_guard_masks_secrets_and_sql_hallucinations() -> None:
 
     cleaned = validate_ai_output(leaked)
 
-    assert "sk-campus-prod" not in cleaned
-    assert "ghp_1234567890" not in cleaned
+    assert "mock_key_dummy_placeholder_xyz987654" not in cleaned
+    assert "neutral_token_placeholder_123456789" not in cleaned
     assert "SELECT email" not in cleaned
     assert "[REDACTED_SECRET]" in cleaned
     assert "[REDACTED_SQL_BLOCK]" in cleaned

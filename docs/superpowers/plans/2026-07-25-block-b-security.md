@@ -172,7 +172,7 @@ Expected: only the three new files appear
 
 ```bash
 git checkout -b chore/test-security-workflow
-printf "OPENAI_API_KEY=sk-test-12345678901234567890\n" > .env
+printf "OPENAI_API_KEY=YOUR_API_KEY_HERE\n" > .env
 git add .env
 git commit -m "test: trigger security workflow"
 git push origin HEAD
@@ -423,14 +423,14 @@ from app.models.base import AIProvider
 
 def test_hosted_provider_keys_are_not_stored_in_plaintext(monkeypatch):
     monkeypatch.setenv("BITACORA_MODE", "hosted")
-    monkeypatch.setenv("ENCRYPTION_KEY", "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
+    monkeypatch.setenv("ENCRYPTION_KEY", "SAFE_TEST_ENCRYPTION_KEY_PLACEHOLDER")
     client = TestClient(app)
 
     response = client.post("/api/providers", json={
         "name": "OpenAI",
         "endpoint": "https://api.openai.com/v1",
         "model": "gpt-4o-mini",
-        "api_key": "sk-live-plain-text-check"
+        "api_key": "SAFE_API_KEY_PLACEHOLDER_FOR_TESTS"
     })
 
     assert response.status_code == 200
@@ -438,7 +438,7 @@ def test_hosted_provider_keys_are_not_stored_in_plaintext(monkeypatch):
     try:
         provider = db.query(AIProvider).filter(AIProvider.name == "OpenAI").first()
         assert provider.api_key_encrypted
-        assert "sk-live-plain-text-check" not in provider.api_key_encrypted
+        assert "SAFE_API_KEY_PLACEHOLDER_FOR_TESTS" not in provider.api_key_encrypted
     finally:
         db.close()
 ```
