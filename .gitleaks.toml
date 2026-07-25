@@ -3,6 +3,13 @@ title = "Bitacora gitleaks config"
 [extend]
 useDefault = true
 
+[allowlist]
+description = "Ignore test fixtures with intentional fake secrets and documentation examples"
+paths = [
+  '''tests/test_b6_guard\.py''',
+  '''docs/''',
+]
+
 [[rules]]
 id = "bitacora-dotenv-file"
 description = "Detect committed environment files"
