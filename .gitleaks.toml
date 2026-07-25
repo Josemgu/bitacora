@@ -1,0 +1,19 @@
+title = "Bitacora gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "bitacora-dotenv-file"
+description = "Detect committed environment files"
+path = '''(?i)(^|/|\\)\.env($|\..*)'''
+
+[[rules]]
+id = "bitacora-api-key-assignment"
+description = "Detect direct API key and token assignments"
+regex = '''(?i)(openai|anthropic|google|github|api|access)[_-]?(api[_-]?key|token|secret)\s*[:=]\s*['"][^'"]{12,}['"]'''
+
+[[rules]]
+id = "bitacora-generic-secret-assignment"
+description = "Detect generic secret assignments in config-like files"
+regex = '''(?i)(api[_-]?key|access[_-]?token|secret|encryption[_-]?key)\s*[:=]\s*['"][^'"]{12,}['"]'''

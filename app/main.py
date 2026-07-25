@@ -32,6 +32,15 @@ app = FastAPI(
     version="2.0.0",
 )
 
+
+@app.middleware("http")
+async def security_headers_middleware(request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
+
 # CORS — allow frontend origin
 app.add_middleware(
     CORSMiddleware,

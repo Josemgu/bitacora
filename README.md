@@ -1,115 +1,142 @@
 # Bitácora
 
-Bitácora es una plataforma de aprendizaje guiada por IA para construir roadmaps técnicos, consumir recursos confiables y practicar con laboratorios reales desde una experiencia web simple y modular.
+Bitácora es una plataforma web universitaria de aprendizaje guiado por IA para crear roadmaps, organizar recursos y practicar de forma segura.
 
-> Estado actual: proyecto en desarrollo activo. La base del Bloque A y la integración inicial de proveedores ya están funcionando, pero el endurecimiento completo de seguridad y varias capas de producto siguen en construcción.
+Este README resume el proyecto completo: arquitectura, seguridad, estructura, ejecución y pruebas.
 
-![Hero](docs/images/bitacora-hero.svg)
+## Qué es Bitácora
 
-## Preview
+Bitácora ayuda a estudiantes a:
+- Planificar rutas de aprendizaje técnico por fases.
+- Gestionar recursos y avances de estudio.
+- Conectarse con proveedores de IA de forma controlada.
+- Usar una base segura con validaciones y capas de defensa.
 
-Estas vistas muestran el estado actual de la aplicación en esta etapa del desarrollo:
+## Estado del proyecto
 
-![Hero visual de Bitácora](docs/images/bitacora-hero.svg)
+- Backend funcional con FastAPI + SQLAlchemy.
+- Frontend SPA en HTML/CSS/JS.
+- Bloques de seguridad B1 a B6 implementados y validados con pruebas.
 
-![Flujo de proveedores y conexión](docs/images/bitacora-providers.svg)
+## Arquitectura general
 
-## Qué hemos construido
+```mermaid
+graph TD
+		U[Usuario] --> G[FastAPI]
+		G --> H[B5: Security Headers]
+		H --> R[B3: Rate Limiting]
+		R --> I[B2: Input Sanitization]
+		I --> C[Controladores]
+		C --> D[(DB via ORM)]
+		C --> BUD[B6: AI Budget]
+		BUD --> LLM[Proveedor IA]
+		LLM --> GUARD[B6: AI Guard]
+		GUARD --> C
+		C --> U
+```
 
-Hasta este punto, el proyecto ya incluye:
+## Estructura del repositorio
 
-- un backend en FastAPI con rutas de configuración y proveedores
-- una SPA de frontend en HTML/CSS/JS con panel de configuración y chat
-- tres formas de conectar proveedores: Ollama local, OpenRouter y clave manual
-- cifrado en navegador para claves de proveedores en modo self-host
-- un callback seguro para OpenRouter con validación de origen
-- pruebas de regresión para el flujo de conexión y la configuración
+```text
+bitacora/
+├── .github/workflows/security.yml
+├── app/
+│   ├── main.py
+│   ├── database.py
+│   ├── models/
+│   ├── routers/
+│   └── services/
+├── backend/security/
+│   ├── inputs.py
+│   ├── rate_limit.py
+│   ├── encryption.py
+│   ├── ai_guard.py
+│   └── ai_budget.py
+├── static/
+├── tests/
+├── docs/
+├── requirements.txt
+└── run.py
+```
 
-![Proveedores](docs/images/bitacora-providers.svg)
+## Seguridad por bloques
 
-## Estado actual del proyecto
+### B1 - CI/CD de seguridad
+- Gitleaks para secretos.
+- Trivy para vulnerabilidades.
+- Pipeline bloquea merges ante hallazgos críticos.
 
-### ✅ Implementado
+### B2 - Saneamiento de entrada
+- Sanitización de HTML con allowlist estricta.
+- Validación de imágenes por Magic Bytes.
+- Limpieza de metadatos EXIF en imágenes.
 
-- Panel de configuración con gestión de proveedores
-- Integración del chat con selección de proveedor
-- Flujo oficial de OpenRouter con PKCE y callback local
-- Guardado seguro de credenciales en navegador
-- Separación de modos self-host y hosted
-- Documentación y variables de entorno actualizadas
-- Pruebas de backend y flujo de proveedores verificadas
+### B3 - Rate limiting
+- Políticas por IP con SlowAPI.
+- Límite estándar: 60/minute.
+- Límite IA: 5/minute.
 
-### 🔄 En progreso
+### B4 - Cifrado en reposo
+- Cifrado de secretos con Fernet.
+- Clave maestra por entorno: BITACORA_MASTER_KEY.
 
-- cierre de la capa de seguridad del Bloque B
-- validación adicional de entrada y sanitización de datos externos
-- hardening de rate limiting y protección API
+### B5 - Cabeceras de seguridad
+- Strict-Transport-Security.
+- X-Content-Type-Options: nosniff.
+- X-Frame-Options: DENY.
 
-### 🚧 En desarrollo
+### B6 - Guardián IA + DB
+- Enmascarado de secretos y SQL alucinado en salida IA.
+- Presupuesto de tokens por usuario/sesión para evitar abuso.
+- Auditoría ORM sin interpolación SQL insegura.
 
-- despliegue de seguridad de nivel producción para el Bloque B
-- validaciones más estrictas para entrada externa y archivos
-- más pruebas de integración y endurecimiento operativo
+## Requisitos
 
-## Inicio rápido
+- Python 3.11+
+- pip
+- Node.js (solo para pruebas JS opcionales)
+
+## Instalación rápida
 
 ```bash
 git clone https://github.com/Josemgu/bitacora.git
 cd bitacora
 pip install -r requirements.txt
-copy .env.example .env   # Windows
-# o cp .env.example .env   # macOS/Linux
+copy .env.example .env
 python run.py
 ```
 
-Abre http://localhost:8000 en tu navegador.
+Abrir en navegador:
+- http://127.0.0.1:8000
 
-## Stack
-
-| Capa | Tecnología |
-|------|-----------|
-| Backend | FastAPI + SQLAlchemy + Pydantic |
-| Base de datos | SQLite local o PostgreSQL por configuración |
-| Frontend | HTML/CSS/JS vanilla |
-| Seguridad | Web Crypto AES-GCM en navegador, validación de callback y modo dual |
-| Integración IA | Ollama, OpenRouter, OpenAI, Anthropic y Google |
-
-## Estructura del proyecto
-
-```text
-bitacora/
-├── app/                # Backend FastAPI
-├── static/             # Frontend y assets de la SPA
-├── tests/              # Pruebas de backend y flujo de proveedores
-├── docs/images/        # Imágenes para documentación y GitHub
-├── .env.example
-├── requirements.txt
-└── run.py
-```
-
-## Variables de entorno
+## Variables de entorno clave
 
 ```env
 BITACORA_MODE=selfhost
 DATABASE_URL=sqlite:///./bitacora.db
 ENCRYPTION_KEY=
+BITACORA_MASTER_KEY=
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000
 ```
 
-## Verificación
+## Pruebas
 
-Ejecuta lo siguiente para validar el estado actual:
+Ejecutar suite Python:
 
 ```bash
 python -m pytest -q
+```
+
+Prueba JS de flujo de proveedor (opcional):
+
+```bash
 node tests/test_provider_connection_flow.js
 ```
 
-## Próximos pasos
+## Documentación adicional
 
-1. completar las capas del Bloque B de seguridad
-2. reforzar sanitización y validaciones de datos externos
-3. preparar una segunda ronda de pruebas de integración
+- 00-START-HERE.md: punto de entrada para continuidad del proyecto.
+- docs/db_privileges.md: política de mínimo privilegio en base de datos.
 
 ## Licencia
 
