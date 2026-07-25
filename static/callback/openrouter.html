@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Conectando OpenRouter</title>
+    <style>
+      body { font-family: Inter, system-ui, sans-serif; background: #020617; color: #e2e8f0; min-height: 100vh; display: grid; place-items: center; margin: 0; }
+      .card { max-width: 480px; width: calc(100% - 2rem); background: #111827; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+      .muted { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1 style="margin-top:0;">Conectando OpenRouter…</h1>
+      <p class="muted" id="status">Finalizando la autorización y guardando el estado local.</p>
+    </main>
+    <script src="../js/provider-connection.js"></script>
+    <script>
+      (async function () {
+        try {
+          const result = await ProviderConnection.finalizeOpenRouterFlow(window.location.href);
+          const status = document.getElementById('status');
+          status.textContent = `Conexión preparada. Código recibido y verificador retenido localmente (${result.verifier.slice(0, 8)}…).`;
+          window.opener && window.opener.postMessage({ type: 'openrouter-callback', payload: result }, window.location.origin);
+          window.close();
+        } catch (err) {
+          document.getElementById('status').textContent = err.message;
+        }
+      })();
+    </script>
+  </body>
+</html>

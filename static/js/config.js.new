@@ -93,23 +93,6 @@ const Config = (() => {
 
   const nowISO = () => new Date().toISOString();
 
-  /** Normaliza un registro de proveedor para soportar tanto campos viejos como nuevos. */
-  function normalizeProvider(provider) {
-    if (!provider || typeof provider !== 'object') return provider;
-
-    const normalized = { ...provider };
-    normalized.name = normalized.name || 'Proveedor';
-    normalized.model = normalized.model || normalized.default_model || 'gpt-4o-mini';
-    normalized.default_model = normalized.default_model || normalized.model || 'gpt-4o-mini';
-    normalized.endpoint = normalized.endpoint || normalized.base_url || normalized.url || '';
-    normalized.base_url = normalized.base_url || normalized.endpoint || '';
-    normalized.active = normalized.active ?? normalized.is_active ?? true;
-    normalized.is_active = normalized.is_active ?? normalized.active ?? true;
-    normalized.mode = normalized.mode || (normalized.is_local ? 'local' : 'cloud');
-    normalized.is_local = normalized.is_local ?? (normalized.mode === 'local');
-    return normalized;
-  }
-
   /** Formatea fecha para nombre de archivo: YYYY-MM-DD */
   const fmtDate = () => {
     const d = new Date();
@@ -123,40 +106,11 @@ const Config = (() => {
 
   /** Inicializa la vista de configuracion. */
   function init() {
-    const section = document.getElementById('view-config') || document.getElementById('config-view');
-    if (!section) {
-      console.warn('[Config] No se encontro la vista de configuracion');
+    $container = document.getElementById('config-view');
+    if (!$container) {
+      console.warn('[Config] No se encontro #config-view');
       return;
     }
-
-    window.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'openrouter-callback') {
-        const payload = event.data.payload || {};
-        const warning = 'Advertencia de gasto: OpenRouter puede cobrar segun el uso de tokens y tu plan. Revisa el presupuesto antes de seguir.';
-        if (payload.ok) {
-          alert(warning);
-        }
-      }
-    });
-
-    // Reemplazar el contenido estatico de la vista por el panel dinamico.
-    const body = section.querySelector('.view-body') || section;
-    if (body) {
-      const existingMount = document.getElementById('config-view');
-      if (existingMount) {
-        existingMount.remove();
-      }
-
-      const mount = document.createElement('div');
-      mount.id = 'config-view';
-      mount.style.width = '100%';
-      body.innerHTML = '';
-      body.appendChild(mount);
-      $container = mount;
-    } else {
-      $container = section;
-    }
-
     render();
   }
 
@@ -170,7 +124,6 @@ const Config = (() => {
         <!-- 9a. Proveedores de IA -->
         <section id="cfg-providers-section">
           <h3 style="font-size:1.125rem;color:#e2e8f0;margin-bottom:0.75rem;">Proveedores de IA</h3>
-          <div id="cfg-provider-connection"></div>
           <div id="cfg-providers-list"></div>
           <div id="cfg-provider-form-wrap" style="margin-top:1rem;display:none;"></div>
         </section>
@@ -214,57 +167,9 @@ const Config = (() => {
   /** Muestra la lista de proveedores configurados. */
   function renderProviders() {
     const $wrap = document.getElementById('cfg-providers-list');
-    const $connection = document.getElementById('cfg-provider-connection');
     if (!$wrap) return;
 
-    state.providers = (DB.getAll('ai_providers') || []).map(normalizeProvider);
-
-    if ($connection) {
-      $connection.innerHTML = `
-        <div class="panel" style="padding:1rem;margin-bottom:1rem;border:1px solid #334155;">
-          <h4 style="margin:0 0 0.5rem;font-size:1rem;color:#e2e8f0;">Conectar proveedor</h4>
-          <p style="margin:0 0 0.75rem;color:#94a3b8;font-size:0.875rem;">
-            Ollama es la opcion recomendada para empezar. OpenRouter solo se usa a traves del flujo oficial de autorizacion y puede generar gastos.
-          </p>
-          <div style="display:flex;flex-direction:column;gap:0.5rem;">
-            <button id="cfg-connect-ollama" class="btn btn-primary" type="button">Conectar Ollama</button>
-            <button id="cfg-connect-openrouter" class="btn btn-ghost" type="button">Conectar OpenRouter</button>
-            <button id="cfg-manual-key" class="btn btn-ghost" type="button">Ingresar clave manualmente</button>
-          </div>
-        </div>
-      `;
-      document.getElementById('cfg-connect-ollama')?.addEventListener('click', () => {
-        showAddProvider();
-        const nameInput = document.getElementById('cfg-name');
-        if (nameInput) nameInput.value = 'Ollama';
-        const endpointInput = document.getElementById('cfg-endpoint');
-        if (endpointInput) endpointInput.value = 'http://localhost:11434/api/chat';
-        const modelInput = document.getElementById('cfg-model');
-        if (modelInput) modelInput.value = 'llama3.2';
-        const modeRadios = document.querySelectorAll('input[name="cfg-mode"]');
-        modeRadios.forEach(r => { if (r.value === 'local') r.checked = true; });
-        _toggleApiKeyField('local');
-      });
-      document.getElementById('cfg-connect-openrouter')?.addEventListener('click', async () => {
-        const warning = await ProviderConnection.buildOpenRouterConnectionWarning({ name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions' });
-        if (!window.confirm(`${warning}\n\nContinuar con la conexion oficial de OpenRouter?`)) return;
-        try {
-          await ProviderConnection.startOpenRouterFlow({ provider: { name: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions' } });
-        } catch (err) {
-          alert(err.message);
-        }
-      });
-      document.getElementById('cfg-manual-key')?.addEventListener('click', () => {
-        showAddProvider();
-        const nameInput = document.getElementById('cfg-name');
-        if (nameInput) nameInput.value = 'Proveedor manual';
-        const endpointInput = document.getElementById('cfg-endpoint');
-        if (endpointInput) endpointInput.value = 'https://api.example.com/v1/chat/completions';
-        const modeRadios = document.querySelectorAll('input[name="cfg-mode"]');
-        modeRadios.forEach(r => { if (r.value === 'cloud') r.checked = true; });
-        _toggleApiKeyField('cloud');
-      });
-    }
+    state.providers = DB.getAll('ai_providers');
 
     if (state.providers.length === 0) {
       $wrap.innerHTML = `
@@ -345,23 +250,12 @@ const Config = (() => {
     const $wrap = document.getElementById('cfg-provider-form-wrap');
     if (!$wrap) return;
 
-    const draftKey = 'bitacora_provider_form_draft';
-    const draft = sessionStorage.getItem(draftKey);
-    let draftData = null;
-    try { draftData = draft ? JSON.parse(draft) : null; } catch (err) { draftData = null; }
-
     state.editingId = provider ? provider.id : null;
     const isEdit = !!provider;
-    const p = normalizeProvider(provider || {});
+    const p = provider || {};
 
     // Determine current mode: 'cloud' or 'local'
     const currentMode = p.mode || (p.is_local ? 'local' : 'cloud');
-    const draftName = draftData && draftData.name ? draftData.name : (p.name || '');
-    const draftEndpoint = draftData && draftData.endpoint ? draftData.endpoint : (p.endpoint || '');
-    const draftModel = draftData && draftData.model ? draftData.model : (p.model || '');
-    const draftEnvKey = draftData && draftData.env_key_name ? draftData.env_key_name : (p.env_key_name || '');
-    const draftActive = draftData && typeof draftData.active === 'boolean' ? draftData.active : (p.active !== false);
-    const draftMode = draftData && draftData.mode ? draftData.mode : currentMode;
 
     $wrap.style.display = 'block';
     $wrap.innerHTML = `
@@ -384,18 +278,18 @@ const Config = (() => {
 
         <div class="field" style="margin-bottom:0.75rem;">
           <label class="label" style="font-size:0.875rem;color:#94a3b8;">Nombre</label>
-          <input id="cfg-name" class="input" value="${esc(draftName)}" placeholder="Ej: OpenAI" style="width:100%;">
+          <input id="cfg-name" class="input" value="${esc(p.name || '')}" placeholder="Ej: OpenAI" style="width:100%;">
         </div>
 
         <div class="field" style="margin-bottom:0.75rem;">
           <label class="label" style="font-size:0.875rem;color:#94a3b8;">Modo</label>
           <div style="display:flex;gap:1rem;flex-wrap:wrap;">
             <label style="display:flex;align-items:center;gap:0.375rem;cursor:pointer;">
-              <input type="radio" name="cfg-mode" value="cloud" ${draftMode === 'cloud' ? 'checked' : ''}>
+              <input type="radio" name="cfg-mode" value="cloud" ${currentMode === 'cloud' ? 'checked' : ''}>
               <span>Nube (Cloud)</span>
             </label>
             <label style="display:flex;align-items:center;gap:0.375rem;cursor:pointer;">
-              <input type="radio" name="cfg-mode" value="local" ${draftMode === 'local' ? 'checked' : ''}>
+              <input type="radio" name="cfg-mode" value="local" ${currentMode === 'local' ? 'checked' : ''}>
               <span>Local (Ollama, etc.)</span>
             </label>
           </div>
@@ -407,15 +301,15 @@ const Config = (() => {
 
         <div class="field" style="margin-bottom:0.75rem;">
           <label class="label" style="font-size:0.875rem;color:#94a3b8;">Endpoint</label>
-          <input id="cfg-endpoint" class="input" value="${esc(draftEndpoint)}" placeholder="https://api.openai.com/v1/chat/completions" style="width:100%;">
+          <input id="cfg-endpoint" class="input" value="${esc(p.endpoint || '')}" placeholder="https://api.openai.com/v1/chat/completions" style="width:100%;">
         </div>
 
         <div class="field" style="margin-bottom:0.75rem;">
           <label class="label" style="font-size:0.875rem;color:#94a3b8;">Modelo por defecto</label>
-          <input id="cfg-model" class="input" value="${esc(draftModel)}" placeholder="gpt-4o-mini" style="width:100%;">
+          <input id="cfg-model" class="input" value="${esc(p.model || '')}" placeholder="gpt-4o-mini" style="width:100%;">
         </div>
 
-        <div class="field" id="cfg-api-key-field" style="margin-bottom:0.75rem;${draftMode === 'local' ? 'display:none;' : ''}">
+        <div class="field" id="cfg-api-key-field" style="margin-bottom:0.75rem;${currentMode === 'local' ? 'display:none;' : ''}">
           <label class="label" style="font-size:0.875rem;color:#94a3b8;">API Key</label>
           <div style="display:flex;gap:0.5rem;">
             <input id="cfg-api-key" class="input" type="password" value="" placeholder="Ingresa tu API key (se cifra localmente)" style="flex:1;">
@@ -431,13 +325,13 @@ const Config = (() => {
 
         <div class="field" style="margin-bottom:0.75rem;">
           <label class="label" style="font-size:0.875rem;color:#94a3b8;">Variable de entorno (opcional)</label>
-          <input id="cfg-env-key" class="input" value="${esc(draftEnvKey)}" placeholder="\$OPENAI_API_KEY" style="width:100%;">
+          <input id="cfg-env-key" class="input" value="${esc(p.env_key_name || '')}" placeholder="\$OPENAI_API_KEY" style="width:100%;">
           <p class="panel-note" style="margin-top:0.25rem;font-size:0.75rem;color:#64748b;">Si se define, la app intentara leer la clave desde process.env en el servidor.</p>
         </div>
 
         <div class="field" style="margin-bottom:0.75rem;">
           <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
-            <input id="cfg-active" type="checkbox" ${draftActive ? 'checked' : ''}>
+            <input id="cfg-active" type="checkbox" ${p.active !== false ? 'checked' : ''}>
             <span style="font-size:0.875rem;color:#94a3b8;">Activo</span>
           </label>
         </div>
@@ -497,43 +391,6 @@ const Config = (() => {
 
     // Save button
     document.getElementById('cfg-save')?.addEventListener('click', () => _saveProvider());
-
-    const draftInputs = ['cfg-name', 'cfg-endpoint', 'cfg-model', 'cfg-env-key'];
-    draftInputs.forEach((id) => {
-      const input = document.getElementById(id);
-      input?.addEventListener('input', () => {
-        sessionStorage.setItem(draftKey, JSON.stringify({
-          name: document.getElementById('cfg-name')?.value || '',
-          endpoint: document.getElementById('cfg-endpoint')?.value || '',
-          model: document.getElementById('cfg-model')?.value || '',
-          env_key_name: document.getElementById('cfg-env-key')?.value || '',
-          active: document.getElementById('cfg-active')?.checked !== false,
-          mode: document.querySelector('input[name="cfg-mode"]:checked')?.value || 'cloud'
-        }));
-      });
-    });
-    document.querySelectorAll('input[name="cfg-mode"]').forEach((radio) => {
-      radio.addEventListener('change', () => {
-        sessionStorage.setItem(draftKey, JSON.stringify({
-          name: document.getElementById('cfg-name')?.value || '',
-          endpoint: document.getElementById('cfg-endpoint')?.value || '',
-          model: document.getElementById('cfg-model')?.value || '',
-          env_key_name: document.getElementById('cfg-env-key')?.value || '',
-          active: document.getElementById('cfg-active')?.checked !== false,
-          mode: document.querySelector('input[name="cfg-mode"]:checked')?.value || 'cloud'
-        }));
-      });
-    });
-    document.getElementById('cfg-active')?.addEventListener('change', () => {
-      sessionStorage.setItem(draftKey, JSON.stringify({
-        name: document.getElementById('cfg-name')?.value || '',
-        endpoint: document.getElementById('cfg-endpoint')?.value || '',
-        model: document.getElementById('cfg-model')?.value || '',
-        env_key_name: document.getElementById('cfg-env-key')?.value || '',
-        active: document.getElementById('cfg-active')?.checked !== false,
-        mode: document.querySelector('input[name="cfg-mode"]:checked')?.value || 'cloud'
-      }));
-    });
   }
 
   /** Toggle API key field visibility based on mode. @private */
@@ -597,12 +454,9 @@ const Config = (() => {
       name,
       endpoint,
       model,
-      default_model: model,
       env_key_name: envKeyName,
       active,
-      is_active: active,
       mode,
-      is_local: mode === 'local',
       updated_at: nowISO()
     };
 
@@ -636,7 +490,7 @@ const Config = (() => {
       }
       state.editingId = null;
       renderProviders();
-      await AIChat.loadProviders();
+      AIChat.loadProviders();
       AIChat.renderProviderSelector();
     } catch (err) {
       console.error('[Config] Error saving provider:', err);
@@ -866,7 +720,7 @@ const Config = (() => {
       </div>
     `;
 
-    document.getElementById('cfg-import-confirm')?.addEventListener('click', async () => {
+    document.getElementById('cfg-import-confirm')?.addEventListener('click', () => {
       if (!state.importData) return;
       const ok = DB.importAll(state.importData);
       if (ok) {
@@ -877,7 +731,7 @@ const Config = (() => {
         $wrap.innerHTML = '';
         // Recargar datos en UI
         renderProviders();
-        await AIChat.loadProviders();
+        AIChat.loadProviders();
         AIChat.renderProviderSelector();
       } else {
         alert('Error al importar los datos.');

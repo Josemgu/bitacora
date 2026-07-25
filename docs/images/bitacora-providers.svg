@@ -1,0 +1,17 @@
+<svg width="1400" height="800" viewBox="0 0 1400 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="800" rx="32" fill="#020617"/>
+  <rect x="70" y="70" width="1260" height="660" rx="28" fill="#0F172A" stroke="#334155" stroke-width="2"/>
+  <text x="120" y="170" fill="#E2E8F0" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="700">Flujo de proveedores</text>
+  <rect x="120" y="230" width="320" height="220" rx="24" fill="#111827" stroke="#38BDF8"/>
+  <text x="155" y="285" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="600">1. Ollama local</text>
+  <text x="155" y="330" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="20">Sin cuenta, ideal para empezar</text>
+  <rect x="540" y="230" width="320" height="220" rx="24" fill="#111827" stroke="#A78BFA"/>
+  <text x="575" y="285" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="600">2. OpenRouter</text>
+  <text x="575" y="330" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="20">Flujo oficial con PKCE y callback</text>
+  <rect x="960" y="230" width="320" height="220" rx="24" fill="#111827" stroke="#22C55E"/>
+  <text x="995" y="285" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="600">3. Clave manual</text>
+  <text x="995" y="330" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="20">Guía paso a paso para cada proveedor</text>
+  <rect x="120" y="520" width="1160" height="140" rx="24" fill="#111827" stroke="#475569"/>
+  <text x="155" y="575" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">Todas las opciones terminan con credenciales protegidas y listas para usar</text>
+  <text x="155" y="620" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">Cifrado en navegador, validación de origen y política estricta de logging</text>
+</svg>

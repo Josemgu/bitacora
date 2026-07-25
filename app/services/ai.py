@@ -4,30 +4,66 @@ Handles AI-powered resource suggestions, roadmap enhancement, and content genera
 """
 import json
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
+from app.config import get_settings, BitacoraMode
 from app.models import AIProvider
 from app.schemas import AIProvider as AIProviderSchema
+from app.security import decrypt_api_key
 
 logger = logging.getLogger(__name__)
 
 
+def _get_provider_api_key(provider: AIProvider) -> str | None:
+    """
+    Get the API key for a provider based on the operating mode.
+    
+    In self-hosted mode: reads from environment variable (provider.api_key_env_var)
+    In hosted mode: decrypts the stored encrypted key (provider.api_key_encrypted)
+    
+    Returns None for Ollama (no API key needed) or if key is not available.
+    """
+    settings = get_settings()
+    
+    # Ollama doesn't need an API key
+    if provider.provider_type == "ollama":
+        return "ollama"
+    
+    if settings.BITACORA_MODE == BitacoraMode.SELF_HOST:
+        # Self-hosted mode: API key comes from environment variable
+        if provider.api_key_env_var:
+            return os.getenv(provider.api_key_env_var)
+        return None
+    else:
+        # Hosted mode: decrypt the stored encrypted key
+        if provider.api_key_encrypted:
+            try:
+                return decrypt_api_key(provider.api_key_encrypted)
+            except Exception as e:
+                logger.error(f"Failed to decrypt API key for provider {provider.name}: {e}")
+                return None
+        return None
+
+
 def _get_provider_client(provider: AIProvider):
     """Get the appropriate AI client based on provider type."""
+    api_key = _get_provider_api_key(provider)
+    
     if provider.provider_type == "openai":
         from openai import OpenAI
-        return OpenAI(api_key=provider.api_key, base_url=provider.base_url)
+        return OpenAI(api_key=api_key, base_url=provider.base_url)
     elif provider.provider_type == "anthropic":
         from anthropic import Anthropic
-        return Anthropic(api_key=provider.api_key, base_url=provider.base_url)
+        return Anthropic(api_key=api_key, base_url=provider.base_url)
     elif provider.provider_type == "ollama":
         from openai import OpenAI
         return OpenAI(api_key="ollama", base_url=provider.base_url or "http://localhost:11434/v1")
     else:
         # Default to OpenAI-compatible
         from openai import OpenAI
-        return OpenAI(api_key=provider.api_key, base_url=provider.base_url)
+        return OpenAI(api_key=api_key, base_url=provider.base_url)
 
 
 def _call_ai(provider: AIProvider, messages: List[Dict[str, str]], model: Optional[str] = None, **kwargs) -> str:

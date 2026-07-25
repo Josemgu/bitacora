@@ -6,7 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from app.database import get_db
 from app.models.base import (
@@ -21,7 +21,7 @@ router = APIRouter()
 @router.get("/health", response_model=HealthResponse)
 def health_check(db: Session = Depends(get_db)):
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         return HealthResponse(status="ok", db="connected", timestamp=datetime.utcnow())
     except Exception as e:
         return HealthResponse(status="error", db=str(e), timestamp=datetime.utcnow())

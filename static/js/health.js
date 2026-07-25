@@ -306,7 +306,7 @@ const Health = (() => {
   /** Estado del verificador de links (cantidad de rotos). */
   function _checkLinks() {
     try {
-      const broken = _dbGetAll('links').filter(l => l.status === 'broken');
+      const broken = _dbGetAll('resources').filter(l => l.status === 'broken');
       return broken.length === 0 ? 'ok' : 'warn';
     } catch {
       return 'warn';
@@ -317,7 +317,7 @@ const Health = (() => {
   function _checkQueue() {
     try {
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
-      const stale = _dbGetAll('queue').filter(q => {
+      const stale = _dbGetAll('resource_queue').filter(q => {
         const age = Date.now() - (q.timestamp || 0);
         return age > sevenDays;
       });

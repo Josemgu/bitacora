@@ -1,83 +1,99 @@
-# Bitacora - Learning OS
+# Bitácora
 
-Diario de aprendizaje interactivo impulsado por IA para aprender cualquier rama de tecnologia mediante roadmaps interactivos, recursos oficiales, laboratorios, proyectos, planificacion inteligente y seguimiento personalizado.
+Bitácora es una plataforma de aprendizaje guiada por IA para construir roadmaps técnicos, consumir recursos confiables y practicar con laboratorios reales desde una experiencia web simple y modular.
 
-## Instalacion rapida
+![Hero](docs/images/bitacora-hero.svg)
+
+## Qué hemos construido
+
+Hasta este punto, el proyecto ya incluye:
+
+- un backend en FastAPI con rutas de configuración y proveedores
+- una SPA de frontend en HTML/CSS/JS con panel de configuración y chat
+- tres formas de conectar proveedores: Ollama local, OpenRouter y clave manual
+- cifrado en navegador para claves de proveedores en modo self-host
+- un callback seguro para OpenRouter con validación de origen
+- pruebas de regresión para el flujo de conexión y la configuración
+
+![Proveedores](docs/images/bitacora-providers.svg)
+
+## Estado actual del proyecto
+
+### ✅ Implementado
+
+- Panel de configuración con gestión de proveedores
+- Integración del chat con selección de proveedor
+- Flujo oficial de OpenRouter con PKCE y callback local
+- Guardado seguro de credenciales en navegador
+- Separación de modos self-host y hosted
+- Documentación y variables de entorno actualizadas
+- Pruebas de backend y flujo de proveedores verificadas
+
+### 🔄 En progreso
+
+- cierre de la capa de seguridad del Bloque B
+- validación adicional de entrada y sanitización de datos externos
+- hardening de rate limiting y protección API
+
+## Inicio rápido
 
 ```bash
 git clone https://github.com/Josemgu/bitacora.git
 cd bitacora
 pip install -r requirements.txt
+copy .env.example .env   # Windows
+# o cp .env.example .env   # macOS/Linux
 python run.py
-# Abre http://localhost:8000 en tu navegador
 ```
+
+Abre http://localhost:8000 en tu navegador.
 
 ## Stack
 
-| Capa | Tecnologia |
+| Capa | Tecnología |
 |------|-----------|
-| Backend | FastAPI (Python) |
-| Base de datos | SQLite (archivo `.db` en `/data/`) |
-| Frontend | HTML/CSS/JS vanilla (desde `static/`) |
-| Comunicacion | `fetch()` del frontend contra `/api/*` |
+| Backend | FastAPI + SQLAlchemy + Pydantic |
+| Base de datos | SQLite local o PostgreSQL por configuración |
+| Frontend | HTML/CSS/JS vanilla |
+| Seguridad | Web Crypto AES-GCM en navegador, validación de callback y modo dual |
+| Integración IA | Ollama, OpenRouter, OpenAI, Anthropic y Google |
 
 ## Estructura del proyecto
 
-```
+```text
 bitacora/
-├── data/                    # Datos locales
-│   ├── bitacora.db          # SQLite
-│   ├── uploads/             # Archivos subidos
-│   │   ├── roadmaps/
-│   │   ├── recursos/
-│   │   └── chat/
-│   ├── exports/             # JSON exportados
-│   └── logs/                # Logs de app y IA
-├── app/                     # FastAPI backend
-│   ├── main.py              # Punto de entrada
-│   ├── database.py          # SQLAlchemy + SQLite
-│   ├── schemas.py           # Pydantic schemas
-│   ├── models/              # Modelos SQLAlchemy
-│   ├── routers/             # Endpoints API
-│   └── services/            # Logica de negocio + seed
-├── static/                  # Frontend
-│   ├── index.html           # App SPA
-│   ├── css/styles.css       # Diseño visual
-│   ├── js/                  # 19 modulos JS
-│   └── data/seed.js         # Datos iniciales
-├── requirements.txt
-├── docker-compose.yml
+├── app/                # Backend FastAPI
+├── static/             # Frontend y assets de la SPA
+├── tests/              # Pruebas de backend y flujo de proveedores
+├── docs/images/        # Imágenes para documentación y GitHub
 ├── .env.example
-└── run.py                   # python run.py
+├── requirements.txt
+└── run.py
 ```
-
-## Funcionalidades
-
-- **Roadmap interactivo** - 3 niveles: fases, temas, subtemas con checkboxes
-- **Recursos CRUD** - Biblioteca con filtros, busqueda y categorias
-- **Chat IA multi-proveedor** - OpenAI, Anthropic, Google, Ollama
-- **Verificador de links** - Comprobacion automatica de enlaces rotos
-- **Descubridor de recursos** - Busqueda inteligente por fase
-- **Cola de aprobacion** - La IA propone, tu decides
-- **Diagnostico de errores** - Panel de salud del sistema
-- **Proyectos GitHub** - Checklist de requisitos por proyecto
-- **Laboratorios** - 15 plataformas de practica
-- **Tutoriales** - Contenido educativo filtrable
-- **Centro de inteligencia** - Buzon estilo correo con alertas
-- **Notas** - Editor markdown con auto-guardado
-- **Perfil de usuario** - Configuracion personal
-- **Tema oscuro/claro** - Toggle con selector de color
 
 ## Variables de entorno
 
-Copia `.env.example` a `.env` y configura:
-
 ```env
-# AI Provider API Keys (solo los que uses)
-# OPENAI_API_KEY=sk-...
-# ANTHROPIC_API_KEY=sk-ant-...
-# GOOGLE_API_KEY=...
+BITACORA_MODE=selfhost
+DATABASE_URL=sqlite:///./bitacora.db
+ENCRYPTION_KEY=
+CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000
 ```
+
+## Verificación
+
+Ejecuta lo siguiente para validar el estado actual:
+
+```bash
+python -m pytest -q
+node tests/test_provider_connection_flow.js
+```
+
+## Próximos pasos
+
+1. completar las capas del Bloque B de seguridad
+2. reforzar sanitización y validaciones de datos externos
+3. preparar una segunda ronda de pruebas de integración
 
 ## Licencia
 

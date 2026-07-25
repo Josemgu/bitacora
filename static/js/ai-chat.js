@@ -53,6 +53,23 @@ const AIChat = (() => {
 
   const nowISO = () => new Date().toISOString();
 
+  /** Normaliza un registro de proveedor para soportar campos antiguos y nuevos. */
+  function normalizeProvider(provider) {
+    if (!provider || typeof provider !== 'object') return provider;
+
+    const normalized = { ...provider };
+    normalized.name = normalized.name || 'Proveedor';
+    normalized.model = normalized.model || normalized.default_model || 'gpt-4o-mini';
+    normalized.default_model = normalized.default_model || normalized.model || 'gpt-4o-mini';
+    normalized.endpoint = normalized.endpoint || normalized.base_url || normalized.url || '';
+    normalized.base_url = normalized.base_url || normalized.endpoint || '';
+    normalized.active = normalized.active ?? normalized.is_active ?? true;
+    normalized.is_active = normalized.is_active ?? normalized.active ?? true;
+    normalized.mode = normalized.mode || (normalized.is_local ? 'local' : 'cloud');
+    normalized.is_local = normalized.is_local ?? (normalized.mode === 'local');
+    return normalized;
+  }
+
   /** Muestra una clave API enmascarada: sk-xxxxxxxxxxxx...4f2a */
   const maskKey = (key) => {
     if (!key || key.length < 8) return '...';
@@ -422,7 +439,9 @@ const AIChat = (() => {
   /** Devuelve un mensaje de error amigable segun el tipo de fallo. */
   function _friendlyError(err) {
     if (err instanceof HttpError) {
-      if (err.status === 401) return 'La clave fue rechazada. Revisa que sea del proveedor correcto.';
+      if (err.status === 401) {
+        return 'La autenticacion fue rechazada. Si usaste OpenRouter, revisa que la conexion siga activa y que el modelo este permitido. Si es una clave manual, verifica que sea la correcta.';
+      }
       if (err.status === 429) return 'Limite de peticiones alcanzado. Espera unos segundos.';
       return `Error del servidor (${err.status}). Intenta de nuevo.`;
     }
@@ -571,26 +590,38 @@ const AIChat = (() => {
       $keyNote.textContent = 'Modo local: introduce una clave API para usar este proveedor.';
       return;
     }
+    const provider = state.providers.find(p => p.id === providerId) || null;
+    const origin = provider ? ProviderConnection.normalizeProviderOrigin(provider) : 'manual';
     const key = state.apiKeys.get(providerId);
     if (key) {
-      $keyNote.innerHTML = `Clave activa: <code>${esc(maskKey(key))}</code>. Tu clave se usa solo en memoria, nunca se guarda.`;
+      $keyNote.innerHTML = `Clave activa: <code>${esc(maskKey(key))}</code>. Tu clave se usa solo en memoria, nunca se guarda. Origen: <strong>${esc(origin)}</strong>.`;
     } else {
-      $keyNote.textContent = 'Tu clave se usa solo en memoria, nunca se guarda.';
+      $keyNote.textContent = `Tu clave se usa solo en memoria, nunca se guarda. Origen: ${origin}.`;
     }
   }
 
   /* ═════════════════════════════  INICIALIZACION / UI  ═════════════════════════════ */
 
   /** Inicializa la vista de chat. */
-  function init() {
-    $container = document.getElementById('ai-chat-view');
-    if (!$container) {
-      console.warn('[AIChat] No se encontro #ai-chat-view');
+  async function init() {
+    const section = document.getElementById('view-chat');
+    if (!section) {
+      console.warn('[AIChat] No se encontro la vista de chat');
       return;
     }
 
+    const body = section.querySelector('.view-body') || section;
+    body.innerHTML = '';
+
+    const mount = document.createElement('div');
+    mount.id = 'ai-chat-view';
+    mount.style.width = '100%';
+    mount.style.height = '100%';
+    body.appendChild(mount);
+    $container = mount;
+
     // Cargar proveedores y renderizar
-    loadProviders();
+    await loadProviders();
     _renderChatLayout();
     _cacheDOM();
     _bindEvents();
@@ -598,9 +629,21 @@ const AIChat = (() => {
     loadHistory();
   }
 
-  /** Carga proveedores desde DB. */
-  function loadProviders() {
-    state.providers = DB.getAll('ai_providers');
+  /** Carga proveedores desde DB y descifra claves API almacenadas. */
+  async function loadProviders() {
+    state.providers = (DB.getAll('ai_providers') || []).map(normalizeProvider);
+
+    // Descifrar claves API encriptadas y guardarlas en memoria
+    for (const provider of state.providers) {
+      if (provider.api_key_encrypted) {
+        try {
+          const decrypted = await Encryption.decrypt(provider.api_key_encrypted);
+          state.apiKeys.set(provider.id, decrypted);
+        } catch (err) {
+          console.error('[AIChat] Error descifrando clave para proveedor', provider.id, err);
+        }
+      }
+    }
   }
 
   /** Renderiza el layout principal del chat. */
@@ -958,10 +1001,10 @@ const AIChat = (() => {
     if (!prov) return { ok: false, latencyMs: 0, error: 'Proveedor no encontrado' };
 
     const impl = _getImpl(prov);
-    const isOllama = (prov.name || '').toLowerCase().includes('ollama');
+    const origin = ProviderConnection.normalizeProviderOrigin(prov);
+    const isOllama = origin === 'ollama';
     const apiKey = isOllama ? null : (state.apiKeys.get(providerId) || '');
 
-    // Si no hay clave y no es Ollama, no se puede probar
     if (!isOllama && !apiKey) {
       return { ok: false, latencyMs: 0, error: 'No hay clave API configurada para este proveedor' };
     }
@@ -973,7 +1016,8 @@ const AIChat = (() => {
       const opts = {
         apiKey,
         model: prov.model,
-        endpoint: prov.endpoint || undefined
+        endpoint: prov.endpoint || undefined,
+        providerOrigin: origin
       };
       await impl.chat(testMessages, opts);
       const latencyMs = Math.round(performance.now() - start);

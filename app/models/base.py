@@ -311,14 +311,35 @@ class UserProfile(Base):
     accent_color = Column(String(7), default="#3fb950")
 
 
+class ProviderType(str, PyEnum):
+    """Supported AI provider types."""
+    openai = "openai"
+    anthropic = "anthropic"
+    ollama = "ollama"
+    google = "google"
+    openrouter = "openrouter"
+    custom = "custom"
+
+
+class ProviderMode(str, PyEnum):
+    """AI provider mode: cloud (hosted) or local (self-hosted/ollama)."""
+    cloud = "cloud"
+    local = "local"
+
+
 class AIProvider(Base):
     __tablename__ = "ai_providers"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
     slug = Column(String(30), unique=True, nullable=False)
-    endpoint = Column(String(500), nullable=False)
-    api_key_env_var = Column(String(100), nullable=True)
+    provider_type = Column(Enum(ProviderType), nullable=False, default=ProviderType.custom)
+    mode = Column(Enum(ProviderMode), nullable=False, default=ProviderMode.cloud)
+    base_url = Column(String(500), nullable=True)  # Custom endpoint URL
+    endpoint = Column(String(500), nullable=False)  # Legacy field, kept for compatibility
+    api_key_env_var = Column(String(100), nullable=True)  # Env var name (self-host mode)
+    api_key_encrypted = Column(Text, nullable=True)  # Encrypted API key (hosted mode)
+    encryption_version = Column(Integer, default=1, nullable=False)  # For key rotation
     default_model = Column(String(100), nullable=False)
     is_local = Column(Boolean, default=False)
     is_active = Column(Boolean, default=False)

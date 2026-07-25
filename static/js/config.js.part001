@@ -182,6 +182,10 @@ const Config = (() => {
       const statusLabel = p.active !== false ? 'Activo' : 'Inactivo';
       const endpoint = p.endpoint || '-';
       const model = p.model || '-';
+      // Mode badge: cloud (nube) or local (servidor local)
+      const mode = p.mode || (p.is_local ? 'local' : 'cloud');
+      const modeClass = mode === 'local' ? 'tag tag-purple' : 'tag tag-blue';
+      const modeLabel = mode === 'local' ? 'Local' : 'Nube';
 
       html += `
         <div class="panel" style="padding:0.75rem 1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;" data-provider-id="${esc(p.id)}">
@@ -189,6 +193,7 @@ const Config = (() => {
             <div style="font-weight:600;color:#e2e8f0;">${esc(p.name)}</div>
             <div style="font-size:0.8125rem;color:#64748b;margin-top:0.25rem;">
               <span class="${statusClass}">${statusLabel}</span>
+              <span class="${modeClass}" style="margin-left:0.5rem;">${modeLabel}</span>
               <span style="margin-left:0.5rem;">${esc(endpoint)}</span>
               <span style="margin-left:0.5rem;color:#475569;">| ${esc(model)}</span>
             </div>

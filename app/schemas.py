@@ -4,6 +4,7 @@ Pydantic schemas for request/response validation.
 from __future__ import annotations
 
 from datetime import datetime, date, time
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -211,9 +212,26 @@ class UserProfileResponse(UserProfileBase):
 
 # ──────────────── AI Provider ────────────────
 
+class ProviderType(str, Enum):
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
+    GOOGLE = "google"
+    OPENROUTER = "openrouter"
+    CUSTOM = "custom"
+
+
+class ProviderMode(str, Enum):
+    CLOUD = "cloud"
+    LOCAL = "local"
+
+
 class AIProviderBase(BaseModel):
     name: str
     slug: str
+    provider_type: ProviderType = ProviderType.CUSTOM
+    mode: ProviderMode = ProviderMode.CLOUD
+    base_url: Optional[str] = None
     endpoint: str
     api_key_env_var: Optional[str] = None
     default_model: str
@@ -221,10 +239,30 @@ class AIProviderBase(BaseModel):
     is_active: bool = False
 
 
+class AIProviderCreate(AIProviderBase):
+    api_key: Optional[str] = None  # Plain text key for hosted mode (will be encrypted)
+
+
+class AIProviderUpdate(BaseModel):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    provider_type: Optional[ProviderType] = None
+    mode: Optional[ProviderMode] = None
+    base_url: Optional[str] = None
+    endpoint: Optional[str] = None
+    api_key_env_var: Optional[str] = None
+    default_model: Optional[str] = None
+    is_local: Optional[bool] = None
+    is_active: Optional[bool] = None
+    api_key: Optional[str] = None  # Plain text key for hosted mode (will be encrypted)
+
+
 class AIProviderResponse(AIProviderBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     created_at: datetime
+    api_key_encrypted: Optional[str] = None
+    encryption_version: int = 1
 
 
 # ──────────────── Chat ────────────────

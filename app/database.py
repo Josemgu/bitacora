@@ -3,19 +3,20 @@ Database configuration — SQLite para local, compatible con PostgreSQL para hom
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Determine database path from env or default to local data dir
-DB_PATH = os.environ.get("BITACORA_DB_PATH", str(Path(__file__).resolve().parent.parent / "data" / "bitacora.db"))
+from app.config import get_database_url
 
-# Ensure data directory exists
-Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+# Get database URL from config (supports sqlite:/// | postgresql:// | mysql://)
+DATABASE_URL = get_database_url()
 
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DB_PATH}")
+# Ensure data directory exists for SQLite
+if DATABASE_URL.startswith("sqlite"):
+    db_path = DATABASE_URL.replace("sqlite:///", "")
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
 # Engine — pool_pre_ping for PostgreSQL, check_same_thread=False for SQLite
 if DATABASE_URL.startswith("sqlite"):

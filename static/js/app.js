@@ -720,9 +720,17 @@ const App = (function () {
   // ---------- CONFIG ----------
   views.config = async function () {
     try {
+      if (typeof Config !== 'undefined' && Config.init) {
+        Config.init();
+      }
       if (typeof Config !== 'undefined' && Config.render) {
-        const configData = await API.getConfig();
-        Config.render(configData);
+        try {
+          const configData = await API.getConfig();
+          Config.render(configData);
+        } catch (err) {
+          console.warn('[App] Config API no disponible, usando modo local:', err);
+          Config.render();
+        }
       }
     } catch (err) {
       console.error('[App] Error rendering config view:', err);
@@ -1120,6 +1128,16 @@ const App = (function () {
     state.currentTopic = await getCurrentTopic();
 
     // Inicializar modulos (con manejo de errores individual)
+    // Encryption debe inicializarse PRIMERO para que AIChat y Config puedan usarlo
+    if (typeof Encryption !== 'undefined' && Encryption.init) {
+      try {
+        await Encryption.init();
+        console.log('[App] Modulo Encryption inicializado.');
+      } catch (err) {
+        console.error('[App] Error inicializando Encryption:', err);
+      }
+    }
+
     const modules = [
       { name: 'Roadmap', ns: Roadmap },
       { name: 'Resources', ns: Resources },

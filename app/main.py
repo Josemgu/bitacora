@@ -4,7 +4,6 @@ Serves the static frontend and provides the REST API.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException
@@ -12,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from app.config import get_settings, get_bitacora_mode
 from app.database import init_db, get_db
 from app.routers import (
     roadmap, resources, mailbox, chat, profile, providers, health
@@ -58,6 +58,14 @@ if STATIC_DIR.exists():
 # ─── Startup ───
 @app.on_event("startup")
 def startup():
+    # Validate configuration on startup
+    settings = get_settings()
+    settings.validate_encryption_key()
+    
+    # Log the current mode
+    mode = get_bitacora_mode()
+    print(f"🚀 Bitácora starting in {mode.value} mode")
+    
     init_db()
     from app.database import SessionLocal
     db = SessionLocal()
