@@ -919,29 +919,25 @@
       </div>
     </section>
 
-    <!-- ═══════ VISTA: IMPORTAR ROADMAP ═══════ -->
+        <!-- ═══════ VISTA: IMPORTAR ROADMAP ═══════ -->
     <section class="view" id="view-import">
       <div class="view-bar">
         <span class="crumb">importar roadmap</span>
-        <span class="view-bar-meta">markdown · roadmap.sh · JSON</span>
+        <span class="view-bar-meta">markdown · JSON</span>
       </div>
       <div class="view-body">
         <div class="section-head">
           <h1>Importar Roadmap</h1>
-          <p>Trae roadmaps existentes o sube tu propio archivo.</p>
+          <p>Sube un archivo .md o .json con la estructura de tu roadmap.</p>
         </div>
         <div class="grid-2">
           <div class="panel">
-            <div class="panel-head"><h2>Subir archivo Markdown</h2></div>
+            <div class="panel-head"><h2>Subir archivo</h2></div>
             <div class="panel-body">
-              <p class="panel-note">Arrastra un archivo .md o seleccionalo. La estructura se interpreta automaticamente.</p>
+              <p class="panel-note">Selecciona un archivo .md, .markdown o .json. El backend lo parsea y crea la carrera.</p>
               <div class="field">
                 <label>Archivo</label>
-                <input type="file" id="import-md-file" class="input" accept=".md,.markdown" style="padding:6px 10px">
-              </div>
-              <div class="field" style="margin-top:12px">
-                <label>Nombre del roadmap</label>
-                <input type="text" id="import-md-title" class="input" placeholder="Ej: Cloud Security Engineer">
+                <input type="file" id="import-md-file" class="input" accept=".md,.markdown,.json" style="padding:6px 10px">
               </div>
               <button class="btn btn-primary btn-block" id="btn-import-md" style="margin-top:14px">
                 <svg class="ico"><use href="#i-agregar"></use></svg>Importar
@@ -949,71 +945,8 @@
             </div>
           </div>
           <div class="panel">
-            <div class="panel-head"><h2>Desde roadmap.sh</h2></div>
-            <div class="panel-body">
-              <p class="panel-note">Selecciona un roadmap oficial de roadmap.sh.</p>
-              <div class="field">
-                <label>Roadmap</label>
-                <div class="select">
-                  <select id="import-roadmapsh-select">
-                    <option value="">Selecciona...</option>
-                    <option value="devops">DevOps</option>
-                    <option value="docker">Docker</option>
-                    <option value="kubernetes">Kubernetes</option>
-                    <oder="Tu apellido">
-              </div>
-              <div class="field">
-                <label>Meta final</label>
-                <input type="text" id="profile-goal" class="input" placeholder="Ej: Cloud Security Engineer en Canada">
-              </div>
-              <div class="grid-3" style="margin-top:12px">
-                <div class="field">
-                  <label>Idioma de la IA</label>
-                  <div class="select">
-                    <select id="profile-language">
-                      <option value="es">Espanol</option>
-                      <option value="en">English</option>
-                    </select>
-                    <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
-                  </div>
-                </div>
-                <div class="field">
-                  <label>Nivel de experiencia</label>
-                  <div class="select">
-                    <select id="profile-level">
-                      <option value="principiante">Principiante</option>
-                      <option value="intermedio" selected>Intermedio</option>
-                      <option value="avanzado">Avanzado</option>
-                    </select>
-                    <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
-                  </div>
-                </div>
-                <div class="field">
-                  <label>Horas por semana</label>
-                  <input type="number" id="profile-weekly-hours" class="input" value="15" min="1" max="80">
-                </div>
-              </div>
-              <div class="field" style="margin-top:12px">
-                <label>Zona horaria</label>
-                <div class="select">
-                  <select id="profile-timezone">
-                    <option value="America/Santo_Domingo">Santo Domingo (GMT-4)</option>
-                    <option value="America/New_York">New York (GMT-4/5)</option>
-                    <option value="America/Toronto">Toronto (GMT-4/5)</option>
-                    <option value="America/Mexico_City">Mexico City (GMT-6)</option>
-                    <option value="America/Bogota">Bogota (GMT-5)</option>
-                    <option value="America/Lima">Lima (GMT-5)</option>
-                    <option value="America/Santiago">Santiago (GMT-4/3)</option>
-                    <option value="Europe/Madrid">Madrid (GMT+1/2)</option>
-                    <option value="UTC">UTC</option>
-                  </select>
-                  <svg class="ico rot-270"><use href="#i-chevron"></use></svg>
-                </div>
-              </div>
-              <div style="display:flex;gap:10px;margin-top:16px">
-                <button class="btn btn-ghost" id="btn-cancel-profile">Cancelar</button>
-                <button class="btn btn-primary" id="btn-save-profile">Guardar perfil</button>
-              </div>
+            <div class="panel-head"><h2>Preview</h2></div>
+            <div class="panel-body" id="import-preview-area">
             </div>
           </div>
         </div>

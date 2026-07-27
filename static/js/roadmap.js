@@ -138,12 +138,11 @@ const Roadmap = (() => {
   // BIND EVENTS - Full CRUD, Reordering, Import, AI
   // ================================================================
 
-  function bindEvents() {
+    function bindEvents() {
     bindPhaseEvents();
     bindTopicEvents();
     bindSubtopicEvents();
     bindProjectEvents();
-    bindImportEvents();
     bindAIEvents();
     bindReorderEvents();
   }
@@ -541,58 +540,6 @@ const Roadmap = (() => {
       } catch (err) {
         console.error('[Roadmap] Error saving project:', err);
         alert('Error al guardar el proyecto');
-      }
-    };
-  }
-
-  // --- IMPORT EVENTS (roadmap.sh) ---
-  function bindImportEvents() {
-    const importBtn = document.getElementById('import-roadmap-btn');
-    if (importBtn) {
-      importBtn.addEventListener('click', () => openImportModal());
-    }
-  }
-
-  async function openImportModal() {
-    const modal = document.getElementById('import-modal');
-    const form = document.getElementById('import-form');
-    if (!modal || !form) return;
-
-    // Load available roadmap.sh roadmaps
-    try {
-      const roadmaps = await RoadmapAPI.getRoadmapShRoadmaps();
-      const select = document.getElementById('import-roadmap-id');
-      select.innerHTML = roadmaps.map(r => 
-        `<option value="${r.id}">${r.title} (${r.category})</option>`
-      ).join('');
-    } catch (err) {
-      console.error('[Roadmap] Error loading roadmap.sh roadmaps:', err);
-    }
-
-    modal.classList.add('open');
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const data = {
-        roadmap_id: document.getElementById('import-roadmap-id').value,
-        career_path: document.getElementById('import-career-path').value || null,
-        use_ai_enhancement: document.getElementById('import-use-ai').checked,
-      };
-
-      try {
-        const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.textContent = 'Importando...';
-        
-        await RoadmapAPI.importRoadmapSh(data);
-        modal.classList.remove('open');
-        await render();
-      } catch (err) {
-        console.error('[Roadmap] Error importing roadmap:', err);
-        alert('Error al importar el roadmap');
-      } finally {
-        const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = false;
-        btn.textContent = 'Importar';
       }
     };
   }

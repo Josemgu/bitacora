@@ -395,21 +395,7 @@ const RoadmapAPI = (function () {
     invalidateCache('projectRequirements');
   }
 
-  /* ================================================================
-     ROADMAP.SH IMPORT
-  ================================================================ */
-
-  async function importRoadmapSh(data) {
-    const result = await post('/sh/import', data);
-    invalidateAllCache();
-    return result;
-  }
-
-  async function getRoadmapShRoadmaps() {
-    return get('/sh/roadmaps');
-  }
-
-  /* ================================================================
+    /* ================================================================
      AI RESOURCE SUGGESTIONS
   ================================================================ */
 
@@ -472,15 +458,11 @@ const RoadmapAPI = (function () {
     updateProject,
     deleteProject,
 
-    // Project Requirements
+        // Project Requirements
     getProjectRequirements,
     createProjectRequirement,
     updateProjectRequirement,
     deleteProjectRequirement,
-
-    // Import
-    importRoadmapSh,
-    getRoadmapShRoadmaps,
 
     // AI
     suggestResources,

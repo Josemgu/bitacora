@@ -329,21 +329,7 @@ const API = (function () {
     invalidateCache('subtopics');
   }
 
-  /* ================================================================
-     ROADMAP.SH IMPORT - /api/roadmaps
-  ================================================================ */
-
-  async function importRoadmapSh(data) {
-    const result = await post('/roadmaps/sh/import', data);
-    invalidateAllCache();
-    return result;
-  }
-
-  async function getRoadmapShRoadmaps() {
-    return get('/roadmaps/sh/roadmaps');
-  }
-
-  /* ================================================================
+    /* ================================================================
      AI RESOURCE SUGGESTIONS - /api/roadmaps
   ================================================================ */
 
@@ -985,10 +971,9 @@ const API = (function () {
     getConfig,
     updateConfig,
 
-    // Import/Generate
+        // Import/Generate
     importRoadmap,
     generateRoadmap,
-    getRoadmapShRoadmaps,
     suggestResources,
 
     // Health

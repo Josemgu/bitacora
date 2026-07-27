@@ -7,7 +7,7 @@ from enum import Enum
 from functools import lru_cache
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,13 +58,27 @@ class Settings(BaseSettings):
         description="Base64-encoded 32-byte key for encrypting API keys at rest (hosted mode only)"
     )
     
-    # ──────────────────────────────────────────────────────────────
+        # ──────────────────────────────────────────────────────────────
     # CORS
     # ──────────────────────────────────────────────────────────────
     CORS_ORIGINS: list[str] = Field(
         default=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
         description="Allowed CORS origins"
     )
+
+    # Accept comma-separated (legacy .env format) or JSON array
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            # Try JSON first
+            if v.startswith("["):
+                import json
+                return json.loads(v)
+            # Fallback: comma-separated
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
     
     # ──────────────────────────────────────────────────────────────
     # AI Provider Defaults
