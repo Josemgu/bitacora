@@ -99,12 +99,6 @@ def _reload_app(monkeypatch, tmp_path, db_name: str = "bitacora-test-import.db")
     # needs valid JSON for list[str]. Override to prevent parse error.
     monkeypatch.setenv("CORS_ORIGINS", '["http://localhost:3000"]')
 
-    # Disable rate limiting for tests — the global limiter counter persists
-    # across importlib.reload() calls, so test #3+ would hit 429.
-    import functools
-    import backend.security.rate_limit as rl_module
-    rl_module.limiter.limit = lambda *a, **kw: lambda fn: fn
-
     import app.config as config_module
     import app.database as database_module
     import app.models.base as models_base_module
@@ -123,6 +117,13 @@ def _reload_app(monkeypatch, tmp_path, db_name: str = "bitacora-test-import.db")
     importlib.reload(chat_router)
     importlib.reload(seed_module)
     importlib.reload(main_module)
+
+    # Disable rate limiting AFTER all reloads.  Use monkeypatch.setattr so
+    # the change is scoped to this test function and auto-reverts — this
+    # keeps test_rate_limit_integration.py in the same session (running
+    # after these import tests) from being affected.
+    import backend.security.rate_limit as rl_module
+    monkeypatch.setattr(rl_module.limiter, "enabled", False)
 
     database_module.init_db()
     return TestClient(main_module.app)

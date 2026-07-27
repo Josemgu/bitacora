@@ -1,9 +1,10 @@
-
 /**
  * import-roadmap.js — ImportRoadmap module for Bitacora App
  * Handles importing roadmaps from Markdown (.md) and JSON (.json) files.
  *
- * Uploads the file to POST /api/roadmaps/import (backend parses + persists).
+ * Flow: user selects file → preview shows "Archivo listo" → user clicks
+ * "Importar" → POST /api/roadmaps/import → show result or error.
+ *
  * The frontend no longer parses or stores anything locally.
  *
  * Uses global namespace: App
@@ -17,6 +18,9 @@ const ImportRoadmap = (() => {
   /* ── DOM refs ────────────────────────────────────────────── */
   let $fileInput, $btnImportMD, $previewArea;
 
+  /** The staged file waiting to be uploaded. null = nothing staged. */
+  let _stagedFile = null;
+
   /* ── Init ────────────────────────────────────────────────── */
   function init() {
     $fileInput   = document.getElementById('import-md-file');
@@ -25,9 +29,13 @@ const ImportRoadmap = (() => {
 
     if (!$fileInput || !$previewArea) return;
 
+    _stagedFile = null;
+
     $fileInput.addEventListener('change', handleFileSelect);
     if ($btnImportMD) {
-      $btnImportMD.addEventListener('click', () => $fileInput.click());
+      // First click: if nothing staged, open file picker.
+      // If a file is staged, upload it.
+      $btnImportMD.addEventListener('click', handleButtonClick);
     }
 
     renderEmpty();
@@ -38,31 +46,65 @@ const ImportRoadmap = (() => {
     $previewArea.innerHTML = `
       <div class="empty empty-sm">
         <div class="empty-ico">recursos</div>
-        <div class="empty-hint">Selecciona un archivo .md o .json para ver el preview</div>
+        <div class="empty-hint">Selecciona un archivo .md o .json para importar</div>
       </div>
     `;
   }
 
-  /* ════════════════════════════════════════════════════════════
-     IMPORT FROM FILE (.md / .json)
-     
-     ════════════════════════════════════════════════════════════ */
-
-  async function handleFileSelect(event) {
+  /* ── File input change → stage the file ──────────────────── */
+  function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
 
     const name = file.name.toLowerCase();
     if (!name.endsWith('.md') && !name.endsWith('.markdown') && !name.endsWith('.json')) {
+      _stagedFile = null;
       showError('Por favor selecciona un archivo .md, .markdown o .json');
       return;
     }
 
-    // Loading state — disable input to prevent concurrent uploads
+    _stagedFile = file;
+    renderStaged(file.name);
+  }
+
+  /* ── "Importar" button → stage or upload ─────────────────── */
+  function handleButtonClick() {
+    if (_stagedFile) {
+      doUpload(_stagedFile);
+    } else {
+      $fileInput.click();
+    }
+  }
+
+  /* ── Render "file staged, ready to upload" ──────────────── */
+  function renderStaged(filename) {
+    $previewArea.innerHTML = `
+      <div class="panel">
+        <div class="panel-head">
+          <span class="kicker">Listo para importar</span>
+        </div>
+        <div class="panel-body">
+          <div style="font-size:var(--font-lg);font-weight:700;margin-bottom:8px;">
+            Archivo listo: ${escapeHtml(filename)}
+          </div>
+          <div style="font-size:var(--font-sm);color:var(--text-dim);">
+            Haz clic en <strong>Importar</strong> para cargar el roadmap.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /* ════════════════════════════════════════════════════════════
+     UPLOAD (POST /api/roadmaps/import)
+     ════════════════════════════════════════════════════════════ */
+
+  async function doUpload(file) {
+    // Disable button + input during upload
+    $btnImportMD.disabled = true;
     $fileInput.disabled = true;
     $previewArea.innerHTML = '<div class="empty empty-sm"><div class="empty-hint">Importando...</div></div>';
 
-    // Upload to backend — let the backend parse + validate + persist
     const formData = new FormData();
     formData.append('file', file);
 
@@ -75,6 +117,8 @@ const ImportRoadmap = (() => {
       // 429: rate limit exceeded (5/minute)
       if (response.status === 429) {
         showError('Demasiados intentos. Espera un minuto antes de volver a importar.');
+        // Keep the file staged so user can retry
+        renderStaged(file.name);
         return;
       }
 
@@ -84,16 +128,23 @@ const ImportRoadmap = (() => {
         // 400: backend validation error (structure, field length, encoding)
         // 500: unexpected DB error (generic message)
         showError(data.detail || `Error ${response.status} al importar`);
+        // Keep the file staged so user can retry
+        renderStaged(file.name);
         return;
       }
 
+      // SUCCESS — clear staged file and reset input
+      _stagedFile = null;
+      $fileInput.value = '';
       renderSuccess(data);
     } catch (err) {
       showError('Error de conexion: ' + err.message);
+      // Keep the file staged so user can retry
+      renderStaged(file.name);
     } finally {
-      // Re-enable input and reset so the same file can be selected again
+      // Re-enable controls (button re-enabled; input stays as-is)
+      $btnImportMD.disabled = false;
       $fileInput.disabled = false;
-      if ($fileInput) $fileInput.value = '';
     }
   }
 
@@ -112,7 +163,6 @@ const ImportRoadmap = (() => {
           </ul>
         </div>`;
     }
-
     $previewArea.innerHTML = `
       <div class="panel">
         <div class="panel-head">

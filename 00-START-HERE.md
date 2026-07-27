@@ -106,6 +106,13 @@ Archivos del importador generico:
 - Endpoint en app/routers/roadmap.py (recibe UploadFile, no URL externa)
 - tests/test_roadmap_import.py
 
+A2 CERRADO (2026-07-26):
+- Backend: endpoint POST /api/roadmaps/import funcional, rate limited (ai_limit 5/min), valida extension/tamano/estructura/longitudes, persiste en transaccion unica con rollback.
+- Frontend: import-roadmap.js reimplementado — flujo de dos pasos (seleccionar archivo → clic Importar), preview "Archivo listo" antes de subir, no resetea input en error para permitir reintentos, muestra counts + aviso de activacion en exito.
+- Tests: 8 tests en tests/test_roadmap_import.py (2 exito, 4 error, 1 is_active=False, 1 accent palette). Suite completa verde (20/20). No contamina test_rate_limit_integration.py.
+- Verificacion manual: subida .md → preview con counts → activacion manual. Subida .txt → rechazo con mensaje. Rate limit → 429 con mensaje.
+- Pendiente futuro: test que verifique que el endpoint /import respeta su limite de 5/min (test_rate_limit_integration.py no lo cubre).
+
 ### A3 - Modelo Career (multi-carrera)
 
 PARCIAL - funcionalmente completo, formalmente sin cerrar.
