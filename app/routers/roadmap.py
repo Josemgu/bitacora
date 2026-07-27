@@ -1,17 +1,19 @@
 """
 Roadmap router — Full CRUD for 3-level roadmap (phases → topics → subtopics).
 """
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, status
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.base import (
-    Phase, Topic, Subtopic, Roadmap, ItemStatus, Project, ProjectChecklistItem,
+    Phase, Topic, Subtopic, Roadmap, Career, RoadmapSource, ItemStatus,
+    Project, ProjectChecklistItem,
     ResourceCategory, Resource, ResourceOrigin, LinkStatus,
     SubtopicResource, ProjectStatus,
 )
@@ -24,6 +26,10 @@ from app.schemas import (
     ProjectChecklistItemBase, ProjectChecklistItemResponse,
     RoadmapResponse,
 )
+from backend.security.rate_limit import limiter, ai_limit
+from backend.schemas.roadmap_import import ImportErrorResponse, ImportSuccessResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["roadmap"])
 
@@ -50,7 +56,7 @@ def get_active_roadmap(db: Session) -> Roadmap:
             {"slug": "other", "label": "Otros", "icon": "📦"},
         ]
         for i, cat in enumerate(default_cats):
-            rc = ResourceCategory(roadmap_id=roadmap.id, **cat)
+            rc = ResourceCategory(career_id=roadmap.id, **cat)
             db.add(rc)
         db.commit()
     return roadmap
@@ -141,7 +147,7 @@ def list_phases(db: Session = Depends(get_db)):
     roadmap = get_active_roadmap(db)
     phases = db.query(Phase).options(
         joinedload(Phase.topics).joinedload(Topic.subtopics)
-    ).filter(Phase.roadmap_id == roadmap.id).order_by(Phase.index).all()
+    ).filter(Phase.career_id == roadmap.id).order_by(Phase.index).all()
     return phases
 
 
@@ -149,9 +155,9 @@ def list_phases(db: Session = Depends(get_db)):
 def create_phase(phase: PhaseCreate, db: Session = Depends(get_db)):
     roadmap = get_active_roadmap(db)
     # Auto-assign index if not provided
-    max_index = db.query(func.max(Phase.index)).filter(Phase.roadmap_id == roadmap.id).scalar() or -1
+    max_index = db.query(func.max(Phase.index)).filter(Phase.career_id == roadmap.id).scalar() or -1
     new_phase = Phase(
-        roadmap_id=roadmap.id,
+        career_id=roadmap.id,
         index=phase.index if phase.index is not None else max_index + 1,
         title=phase.title,
         description=phase.description,
@@ -516,25 +522,267 @@ def delete_checklist_item(item_id: int, db: Session = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────────────────────────────
-# ROADMAP.SH INTEGRATION
+# IMPORT (MD/JSON)
 # ──────────────────────────────────────────────────────────────────────
 
-class RoadmapShImportRequest(BaseModel):
-    """Request to import a roadmap from roadmap.sh"""
-    roadmap_id: str  # e.g., "frontend", "backend", "devops", "python", etc.
-    career_path: Optional[str] = None  # Optional career path for AI enhancement
-    use_ai_enhancement: bool = True  # Whether to use AI to enhance the roadmap
+# Accent palette rotated by phase index so the roadmap isn't monochrome.
+_ACCENT_PALETTE = ["#3fb950", "#58a6ff", "#d29922", "#bc8cff", "#f78166"]
+
+# Max upload size: 1 MB (same as parser limit). Validated BEFORE reading
+# the full file into memory to avoid RAM exhaustion on large uploads.
+_MAX_UPLOAD_BYTES = 1 * 1024 * 1024
+
+# Field length limits — must match the SQLAlchemy model column sizes.
+# The parser does NOT validate these; we validate here before persisting.
+_MAX_LEN_CAREER_TITLE = 200
+_MAX_LEN_PHASE_TITLE = 200
+_MAX_LEN_TOPIC_TITLE = 300
+_MAX_LEN_SUBTOPIC_TITLE = 400
+_MAX_LEN_RESOURCE_LABEL = 200
+_MAX_LEN_RESOURCE_URL = 1000
 
 
-class RoadmapShRoadmapResponse(BaseModel):
-    """Response for available roadmap.sh roadmaps"""
-    id: str
-    title: str
-    description: str
-    category: str  # "role-based", "skill-based", "project", "best-practice", "guide"
-    tags: List[str] = []
-    url: str
+def _validate_field_lengths(parsed) -> None:
+    """
+    Validate that parsed data fits within DB column sizes.
+    Raises HTTPException(400) with a clear message on the first violation.
+    Called AFTER parsing but BEFORE the DB transaction.
+    """
+    title = parsed.title
+    if len(title) > _MAX_LEN_CAREER_TITLE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"El titulo de la carrera excede {_MAX_LEN_CAREER_TITLE} caracteres "
+                f"({len(title)} encontrados). Acorte el titulo."
+            ),
+        )
 
+    for phase in parsed.phases:
+        if len(phase.title) > _MAX_LEN_PHASE_TITLE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"El titulo de la fase '{phase.title[:50]}...' excede "
+                    f"{_MAX_LEN_PHASE_TITLE} caracteres ({len(phase.title)} encontrados)."
+                ),
+            )
+        for topic in phase.topics:
+            if len(topic.title) > _MAX_LEN_TOPIC_TITLE:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"El titulo del topic '{topic.title[:50]}...' excede "
+                        f"{_MAX_LEN_TOPIC_TITLE} caracteres ({len(topic.title)} encontrados)."
+                    ),
+                )
+            for sub in topic.subtopics:
+                if len(sub.title) > _MAX_LEN_SUBTOPIC_TITLE:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"El titulo del subtopic '{sub.title[:50]}...' excede "
+                            f"{_MAX_LEN_SUBTOPIC_TITLE} caracteres ({len(sub.title)} encontrados)."
+                        ),
+                    )
+                if sub.resource_label and len(sub.resource_label) > _MAX_LEN_RESOURCE_LABEL:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"La etiqueta del recurso '{sub.resource_label[:50]}...' excede "
+                            f"{_MAX_LEN_RESOURCE_LABEL} caracteres."
+                        ),
+                    )
+                if sub.resource_url and len(sub.resource_url) > _MAX_LEN_RESOURCE_URL:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"La URL del recurso excede {_MAX_LEN_RESOURCE_URL} caracteres. "
+                            f"Use una URL mas corta."
+                        ),
+                    )
+
+
+@router.post("/import", response_model=ImportSuccessResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(ai_limit)
+def import_roadmap(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Import a roadmap from a user-uploaded .md / .markdown / .json file.
+
+    Flow:
+      1. Validate file extension and size (before reading into memory).
+      2. Read content and pass to the parser (validates structure).
+      3. If parser returns error → 400 with the parser's message.
+      4. Validate field lengths against DB column sizes.
+      5. If OK → persist entire career in a single transaction.
+      6. On any persistence error → full rollback, log traceback, generic 500.
+    """
+    from backend.services.roadmap_parser import parse_import
+
+    # ── 1. Extension check ──
+    filename = file.filename or ""
+    name_lower = filename.lower()
+    if not (name_lower.endswith(".md") or name_lower.endswith(".markdown") or name_lower.endswith(".json")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato no soportado. Suba un archivo .md, .markdown o .json.",
+        )
+
+    # ── 2. Size check BEFORE reading into memory ──
+    # FastAPI/Starlette may have already buffered small files, but for
+    # large uploads we check content_length up front.  If the header is
+    # missing or lying, we fall back to the size check after reading.
+    if file.size is not None and file.size > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo excede el limite de {_MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+        )
+
+    # ── 3. Read and decode ──
+    try:
+        raw = file.file.read()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo leer el archivo.",
+        )
+
+    # Double-check size after read (in case content_length was absent/wrong)
+    if len(raw) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El archivo excede el limite de {_MAX_UPLOAD_BYTES // (1024*1024)} MB.",
+        )
+
+    try:
+        content = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo debe estar codificado en UTF-8.",
+        )
+
+    # ── 4. Parse (validates MD/JSON structure, NOT field lengths) ──
+    parsed, error, warnings = parse_import(content, filename)
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
+
+    # ── 5. Validate field lengths BEFORE the DB transaction ──
+    _validate_field_lengths(parsed)
+
+    # ── 6. Persist in a single transaction ──
+    career = None
+    try:
+        # Create Career
+        career = Career(
+            title=parsed.title,
+            source=RoadmapSource.md_import,
+            source_ref=parsed.source_ref,
+            is_active=False,
+        )
+        db.add(career)
+        db.flush()  # assigns career.id without committing
+
+        # Create default resource categories for this career
+        default_cats = [
+            {"slug": "docs",     "label": "Documentación", "icon": "📄"},
+            {"slug": "video",    "label": "Videos",        "icon": "🎬"},
+            {"slug": "lab",      "label": "Labs",          "icon": "🧪"},
+            {"slug": "article",  "label": "Artículos",     "icon": "📝"},
+            {"slug": "tool",     "label": "Herramientas",  "icon": "🔧"},
+            {"slug": "other",    "label": "Otros",         "icon": "📦"},
+        ]
+        for cat in default_cats:
+            db.add(ResourceCategory(career_id=career.id, **cat))
+
+        phase_count = 0
+        topic_count = 0
+        subtopic_count = 0
+        resource_count = 0
+
+        for phase_data in parsed.phases:
+            phase = Phase(
+                career_id=career.id,
+                index=phase_data.index,
+                title=phase_data.title,
+                description=None,
+                accent=_ACCENT_PALETTE[phase_data.index % len(_ACCENT_PALETTE)],
+                status=ItemStatus.todo,
+            )
+            db.add(phase)
+            db.flush()
+            phase_count += 1
+
+            for topic_data in phase_data.topics:
+                topic = Topic(
+                    phase_id=phase.id,
+                    title=topic_data.title,
+                    order=topic_data.order,
+                    status=ItemStatus.todo,
+                )
+                db.add(topic)
+                db.flush()
+                topic_count += 1
+
+                for sub_data in topic_data.subtopics:
+                    subtopic = Subtopic(
+                        topic_id=topic.id,
+                        title=sub_data.title,
+                        order=sub_data.order,
+                        done=False,
+                    )
+                    db.add(subtopic)
+                    db.flush()
+                    subtopic_count += 1
+
+                    # Create SubtopicResource only if parser found a link
+                    if sub_data.resource_url:
+                        db.add(SubtopicResource(
+                            subtopic_id=subtopic.id,
+                            label=sub_data.resource_label or sub_data.title,
+                            url=sub_data.resource_url,
+                            resource_id=None,
+                        ))
+                        resource_count += 1
+
+        # All entities created — commit the transaction
+        db.commit()
+
+    except HTTPException:
+        # Re-raise our own HTTPExceptions (validation errors) as-is
+        db.rollback()
+        raise
+    except Exception:
+        # Unexpected DB error: rollback everything, log the traceback,
+        # return a generic message to the user.
+        db.rollback()
+        logger.exception("Error inesperado al persistir la importacion del roadmap")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error al guardar en la base de datos. La importacion fue cancelada.",
+        )
+
+    return ImportSuccessResponse(
+        career_id=career.id,
+        career_title=career.title,
+        phase_count=phase_count,
+        topic_count=topic_count,
+        subtopic_count=subtopic_count,
+        resource_count=resource_count,
+        warnings=warnings,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────
+# AI — RESOURCE SUGGESTIONS
+# ──────────────────────────────────────────────────────────────────────
 
 class AISuggestResourcesRequest(BaseModel):
     """Request for AI-powered resource suggestions"""
@@ -548,197 +796,6 @@ class AISuggestResourcesRequest(BaseModel):
 class AISuggestResourcesResponse(BaseModel):
     """Response for AI-powered resource suggestions"""
     resources: List[Dict[str, Any]]
-
-
-@router.get("/sh/roadmaps", response_model=List[RoadmapShRoadmapResponse])
-def list_roadmap_sh_roadmaps():
-    """Get list of available roadmap.sh roadmaps (role-based, skill-based, projects, best practices, guides)."""
-    # This returns a curated list of known roadmap.sh roadmaps
-    # In production, this could be fetched from roadmap.sh API or scraped
-    roadmaps = [
-        # Role-based roadmaps
-        {"id": "frontend", "title": "Frontend Developer", "description": "Complete frontend development roadmap", "category": "role-based", "tags": ["javascript", "react", "vue", "css", "html"], "url": "https://roadmap.sh/frontend"},
-        {"id": "backend", "title": "Backend Developer", "description": "Complete backend development roadmap", "category": "role-based", "tags": ["api", "database", "server", "microservices"], "url": "https://roadmap.sh/backend"},
-        {"id": "devops", "title": "DevOps Engineer", "description": "Complete DevOps engineering roadmap", "category": "role-based", "tags": ["ci/cd", "kubernetes", "docker", "cloud", "automation"], "url": "https://roadmap.sh/devops"},
-        {"id": "fullstack", "title": "Full Stack Developer", "description": "Complete full stack development roadmap", "category": "role-based", "tags": ["frontend", "backend", "database", "deployment"], "url": "https://roadmap.sh/full-stack"},
-        {"id": "mobile", "title": "Mobile Developer", "description": "Mobile app development roadmap", "category": "role-based", "tags": ["ios", "android", "flutter", "react-native"], "url": "https://roadmap.sh/mobile"},
-        {"id": "data-scientist", "title": "Data Scientist", "description": "Data science and machine learning roadmap", "category": "role-based", "tags": ["python", "ml", "statistics", "visualization"], "url": "https://roadmap.sh/data-scientist"},
-        {"id": "ml-engineer", "title": "ML Engineer", "description": "Machine learning engineering roadmap", "category": "role-based", "tags": ["mlops", "tensorflow", "pytorch", "deployment"], "url": "https://roadmap.sh/ml-engineer"},
-        {"id": "qa", "title": "QA Engineer", "description": "Quality assurance engineering roadmap", "category": "role-based", "tags": ["testing", "automation", "selenium", "cypress"], "url": "https://roadmap.sh/qa"},
-        {"id": "security", "title": "Cyber Security", "description": "Cybersecurity specialist roadmap", "category": "role-based", "tags": ["pentesting", "network-security", "compliance"], "url": "https://roadmap.sh/cyber-security"},
-        {"id": "site-reliability", "title": "Site Reliability Engineer", "description": "SRE roadmap", "category": "role-based", "tags": ["monitoring", "incident-response", "scalability"], "url": "https://roadmap.sh/sre"},
-        {"id": "software-architect", "title": "Software Architect", "description": "Software architecture roadmap", "category": "role-based", "tags": ["design-patterns", "system-design", "microservices"], "url": "https://roadmap.sh/software-architect"},
-        {"id": "engineering-manager", "title": "Engineering Manager", "description": "Engineering management roadmap", "category": "role-based", "tags": ["leadership", "team-management", "strategy"], "url": "https://roadmap.sh/engineering-manager"},
-        
-        # Skill-based roadmaps
-        {"id": "python", "title": "Python Developer", "description": "Python programming roadmap", "category": "skill-based", "tags": ["python", "django", "fastapi", "data-science"], "url": "https://roadmap.sh/python"},
-        {"id": "javascript", "title": "JavaScript Developer", "description": "JavaScript programming roadmap", "category": "skill-based", "tags": ["javascript", "typescript", "nodejs", "react"], "url": "https://roadmap.sh/javascript"},
-        {"id": "typescript", "title": "TypeScript Developer", "description": "TypeScript programming roadmap", "category": "skill-based", "tags": ["typescript", "type-safety", "angular", "react"], "url": "https://roadmap.sh/typescript"},
-        {"id": "go", "title": "Go Developer", "description": "Go programming roadmap", "category": "skill-based", "tags": ["golang", "microservices", "concurrency"], "url": "https://roadmap.sh/go"},
-        {"id": "rust", "title": "Rust Developer", "description": "Rust programming roadmap", "category": "skill-based", "tags": ["rust", "systems", "webassembly"], "url": "https://roadmap.sh/rust"},
-        {"id": "java", "title": "Java Developer", "description": "Java programming roadmap", "category": "skill-based", "tags": ["java", "spring", "enterprise"], "url": "https://roadmap.sh/java"},
-        {"id": "cpp", "title": "C++ Developer", "description": "C++ programming roadmap", "category": "skill-based", "tags": ["cpp", "systems", "game-dev"], "url": "https://roadmap.sh/cpp"},
-        {"id": "csharp", "title": "C# Developer", "description": "C# and .NET roadmap", "category": "skill-based", "tags": ["csharp", "dotnet", "azure"], "url": "https://roadmap.sh/csharp"},
-        {"id": "php", "title": "PHP Developer", "description": "PHP programming roadmap", "category": "skill-based", "tags": ["php", "laravel", "symfony"], "url": "https://roadmap.sh/php"},
-        {"id": "ruby", "title": "Ruby Developer", "description": "Ruby programming roadmap", "category": "skill-based", "tags": ["ruby", "rails", "web-dev"], "url": "https://roadmap.sh/ruby"},
-        {"id": "swift", "title": "iOS Developer", "description": "iOS development roadmap", "category": "skill-based", "tags": ["swift", "swiftui", "ios", "apple"], "url": "https://roadmap.sh/ios"},
-        {"id": "kotlin", "title": "Android Developer", "description": "Android development roadmap", "category": "skill-based", "tags": ["kotlin", "android", "jetpack-compose"], "url": "https://roadmap.sh/android"},
-        {"id": "flutter", "title": "Flutter Developer", "description": "Flutter cross-platform development roadmap", "category": "skill-based", "tags": ["flutter", "dart", "cross-platform"], "url": "https://roadmap.sh/flutter"},
-        {"id": "react-native", "title": "React Native Developer", "description": "React Native mobile development roadmap", "category": "skill-based", "tags": ["react-native", "mobile", "javascript"], "url": "https://roadmap.sh/react-native"},
-        
-        # Cloud & Infrastructure
-        {"id": "aws", "title": "AWS Cloud Practitioner", "description": "Amazon Web Services roadmap", "category": "skill-based", "tags": ["aws", "cloud", "certification"], "url": "https://roadmap.sh/aws"},
-        {"id": "azure", "title": "Azure Cloud Engineer", "description": "Microsoft Azure roadmap", "category": "skill-based", "tags": ["azure", "cloud", "microsoft"], "url": "https://roadmap.sh/azure"},
-        {"id": "gcp", "title": "Google Cloud Engineer", "description": "Google Cloud Platform roadmap", "category": "skill-based", "tags": ["gcp", "cloud", "google"], "url": "https://roadmap.sh/gcp"},
-        {"id": "kubernetes", "title": "Kubernetes Administrator", "description": "Kubernetes orchestration roadmap", "category": "skill-based", "tags": ["k8s", "containers", "orchestration"], "url": "https://roadmap.sh/kubernetes"},
-        {"id": "docker", "title": "Docker", "description": "Containerization with Docker roadmap", "category": "skill-based", "tags": ["docker", "containers", "devops"], "url": "https://roadmap.sh/docker"},
-        {"id": "terraform", "title": "Terraform", "description": "Infrastructure as Code with Terraform", "category": "skill-based", "tags": ["terraform", "iac", "infrastructure"], "url": "https://roadmap.sh/terraform"},
-        {"id": "ansible", "title": "Ansible", "description": "Automation with Ansible roadmap", "category": "skill-based", "tags": ["ansible", "automation", "configuration-management"], "url": "https://roadmap.sh/ansible"},
-        
-        # Databases
-        {"id": "postgresql", "title": "PostgreSQL", "description": "PostgreSQL database roadmap", "category": "skill-based", "tags": ["postgresql", "sql", "database"], "url": "https://roadmap.sh/postgresql"},
-        {"id": "mongodb", "title": "MongoDB", "description": "MongoDB NoSQL database roadmap", "category": "skill-based", "tags": ["mongodb", "nosql", "database"], "url": "https://roadmap.sh/mongodb"},
-        {"id": "redis", "title": "Redis", "description": "Redis in-memory database roadmap", "category": "skill-based", "tags": ["redis", "cache", "database"], "url": "https://roadmap.sh/redis"},
-        
-        # Project-based roadmaps
-        {"id": "project-ecommerce", "title": "E-commerce Platform", "description": "Build a full-stack e-commerce application", "category": "project", "tags": ["fullstack", "payments", "database", "deployment"], "url": "https://roadmap.sh/projects/ecommerce"},
-        {"id": "project-task-manager", "title": "Task Manager", "description": "Build a task management application", "category": "project", "tags": ["crud", "auth", "real-time"], "url": "https://roadmap.sh/projects/task-manager"},
-        {"id": "project-chat-app", "title": "Real-time Chat App", "description": "Build a real-time chat application", "category": "project", "tags": ["websockets", "real-time", "react"], "url": "https://roadmap.sh/projects/chat-app"},
-        {"id": "project-blog", "title": "Blog Platform", "description": "Build a blog platform with CMS features", "category": "project", "tags": ["cms", "content-management", "seo"], "url": "https://roadmap.sh/projects/blog"},
-        {"id": "project-portfolio", "title": "Developer Portfolio", "description": "Build a personal portfolio website", "category": "project", "tags": ["portfolio", "showcase", "personal-brand"], "url": "https://roadmap.sh/projects/portfolio"},
-        
-        # Best practices
-        {"id": "best-practices-git", "title": "Git Best Practices", "description": "Version control best practices", "category": "best-practice", "tags": ["git", "version-control", "workflow"], "url": "https://roadmap.sh/best-practices/git"},
-        {"id": "best-practices-api", "title": "API Design Best Practices", "description": "RESTful API design guidelines", "category": "best-practice", "tags": ["api", "rest", "design"], "url": "https://roadmap.sh/best-practices/api-design"},
-        {"id": "best-practices-testing", "title": "Testing Best Practices", "description": "Software testing strategies", "category": "best-practice", "tags": ["testing", "tdd", "quality"], "url": "https://roadmap.sh/best-practices/testing"},
-        {"id": "best-practices-security", "title": "Security Best Practices", "description": "Application security guidelines", "category": "best-practice", "tags": ["security", "owasp", "vulnerabilities"], "url": "https://roadmap.sh/best-practices/security"},
-        {"id": "best-practices-performance", "title": "Performance Optimization", "description": "Web performance optimization", "category": "best-practice", "tags": ["performance", "optimization", "web-vitals"], "url": "https://roadmap.sh/best-practices/performance"},
-        
-        # Guides
-        {"id": "guide-system-design", "title": "System Design Guide", "description": "System design interview preparation", "category": "guide", "tags": ["system-design", "architecture", "interview"], "url": "https://roadmap.sh/guides/system-design"},
-        {"id": "guide-career", "title": "Career Guide", "description": "Software engineering career guidance", "category": "guide", "tags": ["career", "job-search", "growth"], "url": "https://roadmap.sh/guides/career"},
-        {"id": "guide-freelancing", "title": "Freelancing Guide", "description": "Freelance software development guide", "category": "guide", "tags": ["freelance", "business", "clients"], "url": "https://roadmap.sh/guides/freelancing"},
-        {"id": "guide-open-source", "title": "Open Source Guide", "description": "Contributing to open source projects", "category": "guide", "tags": ["open-source", "contribution", "github"], "url": "https://roadmap.sh/guides/open-source"},
-    ]
-    return roadmaps
-
-
-@router.post("/sh/import", response_model=RoadmapResponse)
-def import_roadmap_sh(request: RoadmapShImportRequest, db: Session = Depends(get_db)):
-    """
-    Import a roadmap from roadmap.sh into Bitácora.
-    Fetches the roadmap data, optionally enhances with AI, and creates phases/topics/subtopics.
-    """
-    import httpx
-    import json
-    
-    # Fetch roadmap.sh data
-    roadmap_url = f"https://roadmap.sh/{request.roadmap_id}"
-    
-    try:
-        with httpx.Client(timeout=30.0) as client:
-            response = client.get(roadmap_url)
-            response.raise_for_status()
-            html_content = response.text
-    except Exception as e:
-        raise HTTPException(500, f"Failed to fetch roadmap.sh roadmap: {str(e)}")
-    
-    # Parse the roadmap.sh HTML to extract structured data
-    # roadmap.sh uses a specific JSON structure embedded in the page
-    roadmap_data = _parse_roadmap_sh_html(html_content, request.roadmap_id)
-    
-    if not roadmap_data:
-        raise HTTPException(404, f"Could not parse roadmap data for {request.roadmap_id}")
-    
-    # Optionally enhance with AI
-    if request.use_ai_enhancement and request.career_path:
-        roadmap_data = _enhance_roadmap_with_ai(roadmap_data, request.career_path, db)
-    
-    # Create new roadmap in Bitácora
-    # Deactivate current active roadmap
-    db.query(Roadmap).filter(Roadmap.is_active == True).update({Roadmap.is_active: False})
-    
-    roadmap = Roadmap(
-        title=roadmap_data.get("title", f"roadmap.sh - {request.roadmap_id}"),
-        is_active=True,
-        source="roadmap.sh",
-        source_ref=request.roadmap_id,
-    )
-    db.add(roadmap)
-    db.commit()
-    db.refresh(roadmap)
-    
-    # Create default resource categories
-    default_cats = [
-        {"slug": "docs", "label": "Documentación", "icon": "📄"},
-        {"slug": "video", "label": "Videos", "icon": "🎬"},
-        {"slug": "lab", "label": "Labs", "icon": "🧪"},
-        {"slug": "article", "label": "Artículos", "icon": "📝"},
-        {"slug": "tool", "label": "Herramientas", "icon": "🔧"},
-        {"slug": "other", "label": "Otros", "icon": "📦"},
-    ]
-    for i, cat in enumerate(default_cats):
-        rc = ResourceCategory(roadmap_id=roadmap.id, **cat)
-        db.add(rc)
-    db.commit()
-    
-    # Create phases, topics, subtopics from roadmap.sh data
-    for phase_idx, phase_data in enumerate(roadmap_data.get("phases", [])):
-        phase = Phase(
-            roadmap_id=roadmap.id,
-            index=phase_idx,
-            title=phase_data.get("title", f"Phase {phase_idx + 1}"),
-            description=phase_data.get("description", ""),
-            accent=phase_data.get("color", "#3fb950"),
-            status=ItemStatus.todo,
-        )
-        db.add(phase)
-        db.commit()
-        db.refresh(phase)
-        
-        for topic_idx, topic_data in enumerate(phase_data.get("topics", [])):
-            topic = Topic(
-                phase_id=phase.id,
-                order=topic_idx,
-                title=topic_data.get("title", f"Topic {topic_idx + 1}"),
-                status=ItemStatus.todo,
-            )
-            db.add(topic)
-            db.commit()
-            db.refresh(topic)
-            
-            for subtopic_idx, subtopic_data in enumerate(topic_data.get("subtopics", [])):
-                subtopic = Subtopic(
-                    topic_id=topic.id,
-                    order=subtopic_idx,
-                    title=subtopic_data.get("title", f"Subtopic {subtopic_idx + 1}"),
-                    done=False,
-                    notes=subtopic_data.get("description", ""),
-                )
-                db.add(subtopic)
-                db.commit()
-                db.refresh(subtopic)
-                
-                # Add resources if available
-                for resource_data in subtopic_data.get("resources", []):
-                    subtopic_resource = SubtopicResource(
-                        subtopic_id=subtopic.id,
-                        label=resource_data.get("label", resource_data.get("title", "Resource")),
-                        url=resource_data.get("url", ""),
-                    )
-                    db.add(subtopic_resource)
-                db.commit()
-            
-            recalc_topic_status(topic)
-            recalc_phase_status(db, phase)
-            db.commit()
-    
-    # Return the full roadmap with hierarchy
-    roadmap = db.query(Roadmap).options(
-        joinedload(Roadmap.phases).joinedload(Phase.topics).joinedload(Topic.subtopics)
-    ).filter(Roadmap.id == roadmap.id).first()
-    
-    return roadmap
 
 
 @router.post("/ai/suggest-resources", response_model=AISuggestResourcesResponse)
@@ -773,213 +830,3 @@ def ai_suggest_resources(request: AISuggestResourcesRequest, db: Session = Depen
         return {"resources": resources}
     except Exception as e:
         raise HTTPException(500, f"AI resource suggestion failed: {str(e)}")
-
-
-def _parse_roadmap_sh_html(html_content: str, roadmap_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Parse roadmap.sh HTML to extract structured roadmap data.
-    roadmap.sh embeds roadmap data in a JSON script tag.
-    """
-    import re
-    import json
-    
-    # Try to find the roadmap data in the HTML
-    # roadmap.sh typically embeds data in a script tag with id="roadmap-data" or similar
-    patterns = [
-        r'<script[^>]*id=["\']roadmap-data["\'][^>]*>(.*?)</script>',
-        r'<script[^>]*type=["\']application/json["\'][^>]*>(.*?)</script>',
-        r'window\.roadmapData\s*=\s*({.*?});',
-        r'roadmapData\s*:\s*({.*?})',
-    ]
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        for match in matches:
-            try:
-                data = json.loads(match.strip())
-                if data and isinstance(data, dict):
-                    return _transform_roadmap_sh_data(data, roadmap_id)
-            except json.JSONDecodeError:
-                continue
-    
-    # Fallback: try to extract from meta tags or known structure
-    # roadmap.sh uses a specific format - try to find the roadmap JSON
-    # Look for the roadmap content in the page
-    return _extract_roadmap_from_content(html_content, roadmap_id)
-
-
-def _transform_roadmap_sh_data(data: Dict[str, Any], roadmap_id: str) -> Dict[str, Any]:
-    """Transform roadmap.sh data format to Bitácora format."""
-    # roadmap.sh data structure varies, but typically has:
-    # { title, description, phases: [{ title, description, color, topics: [{ title, description, resources: [] }] }] }
-    
-    result = {
-        "title": data.get("title", f"roadmap.sh - {roadmap_id}"),
-        "description": data.get("description", ""),
-        "phases": []
-    }
-    
-    for phase in data.get("phases", []):
-        phase_data = {
-            "title": phase.get("title", phase.get("name", "Untitled Phase")),
-            "description": phase.get("description", ""),
-            "color": phase.get("color", phase.get("accent", "#3fb950")),
-            "topics": []
-        }
-        
-        for topic in phase.get("topics", []):
-            topic_data = {
-                "title": topic.get("title", topic.get("name", "Untitled Topic")),
-                "description": topic.get("description", ""),
-                "subtopics": []
-            }
-            
-            for subtopic in topic.get("subtopics", topic.get("items", [])):
-                subtopic_data = {
-                    "title": subtopic.get("title", subtopic.get("name", "Untitled Subtopic")),
-                    "description": subtopic.get("description", ""),
-                    "resources": []
-                }
-                
-                for resource in subtopic.get("resources", subtopic.get("links", [])):
-                    subtopic_data["resources"].append({
-                        "label": resource.get("label", resource.get("title", "Resource")),
-                        "url": resource.get("url", resource.get("link", "")),
-                    })
-                
-                topic_data["subtopics"].append(subtopic_data)
-            
-            phase_data["topics"].append(topic_data)
-        
-        result["phases"].append(phase_data)
-    
-    return result
-
-
-def _extract_roadmap_from_content(html_content: str, roadmap_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Fallback extraction when JSON parsing fails.
-    Creates a basic structure based on known roadmap.sh roadmaps.
-    """
-    # Known roadmap structures for popular roadmaps
-    known_roadmaps = {
-        "frontend": {
-            "title": "Frontend Developer Roadmap",
-            "phases": [
-                {"title": "Fundamentos", "color": "#f7df1e", "topics": [
-                    {"title": "HTML", "subtopics": [{"title": "Semantic HTML"}, {"title": "Forms"}, {"title": "Accessibility"}]},
-                    {"title": "CSS", "subtopics": [{"title": "Flexbox"}, {"title": "Grid"}, {"title": "Animations"}, {"title": "Responsive Design"}]},
-                    {"title": "JavaScript", "subtopics": [{"title": "ES6+"}, {"title": "Async/Await"}, {"title": "DOM Manipulation"}, {"title": "Modules"}]},
-                ]},
-                {"title": "Frameworks", "color": "#61dafb", "topics": [
-                    {"title": "React", "subtopics": [{"title": "Components"}, {"title": "Hooks"}, {"title": "State Management"}, {"title": "Next.js"}]},
-                    {"title": "Vue", "subtopics": [{"title": "Composition API"}, {"title": "Pinia"}, {"title": "Nuxt.js"}]},
-                    {"title": "TypeScript", "subtopics": [{"title": "Types"}, {"title": "Generics"}, {"title": "Utility Types"}]},
-                ]},
-                {"title": "Herramientas", "color": "#3fb950", "topics": [
-                    {"title": "Build Tools", "subtopics": [{"title": "Vite"}, {"title": "Webpack"}, {"title": "Turbopack"}]},
-                    {"title": "Testing", "subtopics": [{"title": "Vitest"}, {"title": "Playwright"}, {"title": "React Testing Library"}]},
-                    {"title": "Deployment", "subtopics": [{"title": "Vercel"}, {"title": "Netlify"}, {"title": "Docker"}]},
-                ]},
-            ]
-        },
-        "backend": {
-            "title": "Backend Developer Roadmap",
-            "phases": [
-                {"title": "Fundamentos", "color": "#3fb950", "topics": [
-                    {"title": "HTTP/REST", "subtopics": [{"title": "Methods"}, {"title": "Status Codes"}, {"title": "Headers"}]},
-                    {"title": "Databases", "subtopics": [{"title": "SQL"}, {"title": "NoSQL"}, {"title": "ORMs"}]},
-                    {"title": "Caching", "subtopics": [{"title": "Redis"}, {"title": "Memcached"}]},
-                ]},
-                {"title": "Lenguajes & Frameworks", "color": "#61dafb", "topics": [
-                    {"title": "Node.js", "subtopics": [{"title": "Express"}, {"title": "Fastify"}, {"title": "NestJS"}]},
-                    {"title": "Python", "subtopics": [{"title": "FastAPI"}, {"title": "Django"}, {"title": "Flask"}]},
-                    {"title": "Go", "subtopics": [{"title": "Gin"}, {"title": "Echo"}, {"title": "Standard Library"}]},
-                ]},
-                {"title": "Arquitectura", "color": "#f7df1e", "topics": [
-                    {"title": "Microservices", "subtopics": [{"title": "Service Discovery"}, {"title": "API Gateway"}, {"title": "Event-Driven"}]},
-                    {"title": "Message Queues", "subtopics": [{"title": "RabbitMQ"}, {"title": "Kafka"}, {"title": "NATS"}]},
-                    {"title": "Observability", "subtopics": [{"title": "Logging"}, {"title": "Metrics"}, {"title": "Tracing"}]},
-                ]},
-            ]
-        },
-        "devops": {
-            "title": "DevOps Engineer Roadmap",
-            "phases": [
-                {"title": "Linux & Scripting", "color": "#f7df1e", "topics": [
-                    {"title": "Linux Fundamentals", "subtopics": [{"title": "File System"}, {"title": "Permissions"}, {"title": "Process Management"}, {"title": "Shell Scripting"}]},
-                    {"title": "Networking", "subtopics": [{"title": "DNS"}, {"title": "HTTP/HTTPS"}, {"title": "Load Balancing"}, {"title": "Firewalls"}]},
-                ]},
-                {"title": "Containerización", "color": "#2496ed", "topics": [
-                    {"title": "Docker", "subtopics": [{"title": "Images"}, {"title": "Dockerfile"}, {"title": "Compose"}, {"title": "Multi-stage Builds"}]},
-                    {"title": "Kubernetes", "subtopics": [{"title": "Pods"}, {"title": "Services"}, {"title": "Ingress"}, {"title": "Helm"}]},
-                ]},
-                {"title": "CI/CD", "color": "#3fb950", "topics": [
-                    {"title": "GitHub Actions", "subtopics": [{"title": "Workflows"}, {"title": "Actions"}, {"title": "Secrets"}]},
-                    {"title": "GitLab CI", "subtopics": [{"title": "Pipelines"}, {"title": "Runners"}, {"title": "Deployments"}]},
-                    {"title": "ArgoCD", "subtopics": [{"title": "GitOps"}, {"title": "Applications"}, {"title": "Sync"}]},
-                ]},
-                {"title": "Cloud & Infra", "color": "#ff9900", "topics": [
-                    {"title": "AWS", "subtopics": [{"title": "EC2"}, {"title": "S3"}, {"title": "RDS"}, {"title": "EKS"}]},
-                    {"title": "Terraform", "subtopics": [{"title": "Providers"}, {"title": "Modules"}, {"title": "State Management"}]},
-                    {"title": "Monitoring", "subtopics": [{"title": "Prometheus"}, {"title": "Grafana"}, {"title": "Loki"}, {"title": "Alerting"}]},
-                ]},
-            ]
-        },
-        "python": {
-            "title": "Python Developer Roadmap",
-            "phases": [
-                {"title": "Fundamentos", "color": "#3776ab", "topics": [
-                    {"title": "Python Basics", "subtopics": [{"title": "Syntax"}, {"title": "Data Types"}, {"title": "Control Flow"}, {"title": "Functions"}]},
-                    {"title": "OOP", "subtopics": [{"title": "Classes"}, {"title": "Inheritance"}, {"title": "Decorators"}, {"title": "Context Managers"}]},
-                    {"title": "Standard Library", "subtopics": [{"title": "pathlib"}, {"title": "asyncio"}, {"title": "dataclasses"}, {"title": "typing"}]},
-                ]},
-                {"title": "Desarrollo Web", "color": "#009688", "topics": [
-                    {"title": "FastAPI", "subtopics": [{"title": "Routing"}, {"title": "Dependency Injection"}, {"title": "Pydantic"}, {"title": "Testing"}]},
-                    {"title": "Django", "subtopics": [{"title": "Models"}, {"title": "Views"}, {"title": "ORM"}, {"title": "Admin"}]},
-                    {"title": "Database", "subtopics": [{"title": "SQLAlchemy"}, {"title": "Alembic"}, {"title": "PostgreSQL"}, {"title": "Redis"}]},
-                ]},
-                {"title": "Data & ML", "color": "#ff6f00", "topics": [
-                    {"title": "Data Analysis", "subtopics": [{"title": "Pandas"}, {"title": "NumPy"}, {"title": "Visualization"}]},
-                    {"title": "Machine Learning", "subtopics": [{"title": "Scikit-learn"}, {"title": "PyTorch"}, {"title": "TensorFlow"}]},
-                ]},
-            ]
-        },
-    }
-    
-    if roadmap_id in known_roadmaps:
-        return known_roadmaps[roadmap_id]
-    
-    # Generic fallback structure
-    return {
-        "title": f"roadmap.sh - {roadmap_id}",
-        "phases": [
-            {"title": "Fase 1: Fundamentos", "color": "#3fb950", "topics": [
-                {"title": "Tema 1", "subtopics": [{"title": "Subtema 1.1"}, {"title": "Subtema 1.2"}]},
-                {"title": "Tema 2", "subtopics": [{"title": "Subtema 2.1"}, {"title": "Subtema 2.2"}]},
-            ]},
-            {"title": "Fase 2: Avanzado", "color": "#61dafb", "topics": [
-                {"title": "Tema 3", "subtopics": [{"title": "Subtema 3.1"}, {"title": "Subtema 3.2"}]},
-            ]},
-        ]
-    }
-
-
-def _enhance_roadmap_with_ai(roadmap_data: Dict[str, Any], career_path: str, db: Session) -> Dict[str, Any]:
-    """
-    Enhance roadmap data with AI-generated content based on career path.
-    This adds more specific topics, subtopics, and resources tailored to the career.
-    """
-    from app.routers.providers import get_active_provider
-    from app.services.ai import enhance_roadmap_with_ai
-    
-    provider = get_active_provider(db)
-    if not provider:
-        return roadmap_data
-    
-    try:
-        enhanced = enhance_roadmap_with_ai(provider, roadmap_data, career_path)
-        return enhanced
-    except Exception:
-        # If AI enhancement fails, return original data
-        return roadmap_data

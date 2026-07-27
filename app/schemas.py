@@ -76,7 +76,7 @@ class PhaseCreate(PhaseBase):
 class PhaseResponse(PhaseBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    roadmap_id: int
+    career_id: int
     topics: List[TopicResponse] = []
     topic_count: int = 0
     done_topic_count: int = 0
@@ -112,7 +112,7 @@ class ResourceCategoryBase(BaseModel):
 class ResourceCategoryResponse(ResourceCategoryBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    roadmap_id: int
+    career_id: int
 
 
 class ResourceBase(BaseModel):

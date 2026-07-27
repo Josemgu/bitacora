@@ -1,5 +1,5 @@
 from .base import (
-    Roadmap, Phase, Topic, Subtopic, SubtopicResource,
+    Career, Phase, Topic, Subtopic, SubtopicResource,
     ResourceCategory, Resource, ResourceQueue,
     Project, ProjectChecklistItem,
     MailboxItem, ScheduleEntry, DailyNote,
@@ -7,7 +7,7 @@ from .base import (
 )
 
 __all__ = [
-    "Roadmap", "Phase", "Topic", "Subtopic", "SubtopicResource",
+    "Career", "Phase", "Topic", "Subtopic", "SubtopicResource",
     "ResourceCategory", "Resource", "ResourceQueue",
     "Project", "ProjectChecklistItem",
     "MailboxItem", "ScheduleEntry", "DailyNote",

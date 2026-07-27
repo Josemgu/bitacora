@@ -18,7 +18,6 @@ from app.database import Base
 
 class RoadmapSource(str, PyEnum):
     manual = "manual"
-    roadmapsh = "roadmapsh"
     ai_generated = "ai_generated"
     md_import = "md_import"
 
@@ -77,8 +76,8 @@ class ExperienceLevel(str, PyEnum):
     avanzado = "avanzado"
 
 
-class Roadmap(Base):
-    __tablename__ = "roadmaps"
+class Career(Base):
+    __tablename__ = "careers"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), nullable=False)
@@ -87,22 +86,26 @@ class Roadmap(Base):
     is_active = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    phases = relationship("Phase", back_populates="roadmap", cascade="all, delete-orphan")
-    resource_categories = relationship("ResourceCategory", back_populates="roadmap", cascade="all, delete-orphan")
+    phases = relationship("Phase", back_populates="career", cascade="all, delete-orphan")
+    resource_categories = relationship("ResourceCategory", back_populates="career", cascade="all, delete-orphan")
+
+
+# Alias for backward compatibility with app.routers.roadmap
+Roadmap = Career
 
 
 class Phase(Base):
     __tablename__ = "phases"
 
     id = Column(Integer, primary_key=True, index=True)
-    roadmap_id = Column(Integer, ForeignKey("roadmaps.id"), nullable=False)
+    career_id = Column(Integer, ForeignKey("careers.id"), nullable=False)
     index = Column(Integer, nullable=False)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     accent = Column(String(7), default="#3fb950")
     status = Column(Enum(ItemStatus), default=ItemStatus.todo)
 
-    roadmap = relationship("Roadmap", back_populates="phases")
+    career = relationship("Career", back_populates="phases")
     topics = relationship("Topic", back_populates="phase", cascade="all, delete-orphan", order_by="Topic.order")
     projects = relationship("Project", back_populates="phase", cascade="all, delete-orphan")
 
@@ -184,12 +187,12 @@ class ResourceCategory(Base):
     __tablename__ = "resource_categories"
 
     id = Column(Integer, primary_key=True, index=True)
-    roadmap_id = Column(Integer, ForeignKey("roadmaps.id"), nullable=False)
+    career_id = Column(Integer, ForeignKey("careers.id"), nullable=False)
     slug = Column(String(50), nullable=False)
     label = Column(String(100), nullable=False)
     icon = Column(String(50), nullable=True)
 
-    roadmap = relationship("Roadmap", back_populates="resource_categories")
+    career = relationship("Career", back_populates="resource_categories")
     resources = relationship("Resource", back_populates="category")
 
 
