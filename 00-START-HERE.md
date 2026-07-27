@@ -1,4 +1,4 @@
-# Bitacora - Estado real del proyecto
+﻿# Bitacora - Estado real del proyecto
 
 ## Reglas obligatorias antes de tocar codigo
 
@@ -140,11 +140,46 @@ SIN INICIAR. El frontend sigue 100% JavaScript vanilla en static/js/. No existe 
 Criterio de cierre: React corre al lado del frontend actual, la primera vista migrada, los tests de Playwright siguen verdes, MIGRATION.md documenta como seguir.
 ADVERTENCIA: el plano asume que existen tests de Playwright verdes como red de seguridad. Verificar que existan ANTES de empezar la migracion.
 
-### A5 - Licencia MIT y saneo de documentacion
+### A5 - Licencia y saneo de documentacion
 
-SIN INICIAR. NO existe archivo LICENSE en la raiz (verificado con Test-Path). El README nunca se audito contra el comportamiento real del codigo.
-Criterio de cierre: existe LICENSE con MIT, y el README refleja la realidad sin contradecir al codigo.
-NOTA: el README debe decir el stack REAL de hoy (FastAPI + JavaScript vanilla + SQLAlchemy + SQLite), no React, mientras A4 no este hecha.
+✅ CERRADA (2026-07-27).
+
+ARCHIVOS CREADOS:
+- LICENSE: texto oficial completo de GNU Affero General Public License v3 (661 lineas, verificado).
+- NOTICE: copyright del proyecto con referencia a AGPL-3.0.
+- README.md: reescrito completo reflejando la realidad del codigo.
+
+DECISION DE LICENCIA (2026-07-27): AGPL-3.0, no MIT. Modelo open core: nucleo libre, modulo educativo (profesores/estudiantes) comercial y cerrado.
+Dos consecuencias tecnicas para cuando se construya ese modulo: (1) debe estar SEPARADO del codigo AGPL, comunicandose por API o como plugin - si se integra directo, la AGPL obligaria a abrirlo; (2) antes de aceptar contribuciones externas (Bloque I) hace falta un CLA, o el codigo aportado por terceros bloquearia la venta de licencias comerciales.
+
+CONTRADICCIONES ENCONTRADAS Y CORREGIDAS EN EL README (17 de 22 afirmaciones auditadas):
+
+3 MENTIRAS directas:
+1. Licencia decia "MIT" -> corregido a AGPL-3.0
+2. B6.5 (ai_budget.py) aparecia como conectado -> aclarado que esta escrito pero sin conectar
+3. "Bloques B1 a B6 implementados y validados con pruebas" -> corregido: B2 sin callers, B5 parcial, B6 parcial
+
+5 EXAGERACIONES:
+4. Diagrama mostraba B6 budget como nodo activo -> nota aclaratoria
+5. Diagrama mostraba B3 y B5 como pasos intermedios -> movidos a nota como middleware global
+6. "Sanitizacion de HTML" presentada como funcional -> aclarado sin callers reales
+7. "Validacion de imagenes" presentada como funcional -> aclarado sin callers reales
+8. docs/db_privileges.md presentado como implementado -> aclarado como stub
+
+5 INCOMPLETOS:
+9. Estructura del repo omitia app/security.py -> agregado
+10. Variables de entorno incompletas -> referencia a .env.example
+11. Features aspiracionales presentadas como existentes -> movidas a "lo que no existe"
+12. Instrucciones de instalacion sin mkdir data -> agregado
+13. Stack no aclaraba que React/PostgreSQL son aspiracionales -> nota agregada
+
+1 OUTDATED:
+14. Stack decia React vanilla sin aclarar -> aclarado como aspiracional
+
+Pendiente futuro (no bloqueante):
+- Headers de licencia en cada archivo fuente: PENDIENTE OPCIONAL para antes del lanzamiento publico (Bloque I). Son cientos de archivos, no se hace ahora.
+
+Criterio de cierre: ✅ CUMPLIDO - LICENSE con AGPL-3.0, NOTICE con copyright, README refleja la realidad sin contradecir al codigo.
 
 ### A6 - Base de datos flexible (SQLite / PostgreSQL / MySQL)
 
@@ -179,6 +214,7 @@ Decisiones ya tomadas sobre el modelo real (para cuando lleguemos):
 - api.js y roadmapApi.js son wrappers de API DUPLICADOS que hacen lo mismo. Decidir cual se queda.
 - Alias Roadmap = Career en base.py - temporal, eliminar tras limpiar frontend.
 - tools/recombine.py es un script utilitario para recombinar archivos .partNNN (no del plan). docs/superpowers/ y docs/images/ son assets documentales. static/data/seed.js es el seed de datos iniciales del frontend (usa esquema antiguo: phase_id, soporta UNA sola carrera). Ver analisis completo en A3 o seccion de seed.
+- HALLAZGO (2026-07-27): static/js/labs.js contiene LABS_DATA hardcodeado con ~15 laboratorios de TryHackMe, Hack The Box y otras plataformas (nombres, descripciones, URLs de sus cursos). Mismo patron que el catalogo de roadmap.sh que se elimino en A2. PENDIENTE: revisar si redistribuir ese catalogo tiene problema de licencia, y si esos labs deberian venir de Scrapling (Bloque D) en vez de estar hardcodeados. No tocar hasta llegar a Bloque D o E.
 
 ## IDEAS PARA BLOQUES FUTUROS (no implementar todavia)
 
