@@ -565,7 +565,7 @@ const Config = (() => {
         }
       }
     } catch (err) {
-      console.error('[Config] Error decrypting key:', err);
+            console.error('[Config] Error decrypting key:', err.message);
       if ($status) {
         $status.textContent = 'Error al descifrar la clave';
         $status.style.color = '#f85149';
@@ -611,7 +611,7 @@ const Config = (() => {
       try {
         data.api_key_encrypted = await Encryption.encrypt(apiKey);
       } catch (err) {
-        console.error('[Config] Error encrypting key:', err);
+                console.error('[Config] Error encrypting key:', err.message);
         alert('Error al cifrar la API Key: ' + err.message);
         return;
       }
