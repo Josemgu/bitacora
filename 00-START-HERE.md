@@ -198,6 +198,21 @@ CERRADO con matices:
 - B5 (cabeceras de seguridad): parcial. Solo cabeceras estaticas (HSTS, X-Content-Type-Options, X-Frame-Options). Falta redirect HTTPS y gating por APP_ENV/FORCE_HTTPS/TRUST_PROXY_HEADERS - diferido a Bloque H (despliegue), depende de si habra reverse proxy.
 - B6 (guardian IA + DB): parcial. B6.2 implementado con enfoque distinto al especificado (ai_guard.py enmascara con regex; el plan pedia output_guard.py con validacion de esquema Pydantic que rechaza). B6.3 sin iniciar. B6.4: existe docs/db_privileges.md pero es un stub/politica, no implementacion (falta deploy/db_roles.sql y tests/test_db_privileges.py). B6.5 (ai_budget.py) escrito pero sin conectar - espera Bloque F1 (registry.py).
 
+### B6.6 - Lista blanca para partes no parametrizables de consultas (NUEVO)
+
+NO INICIADO. Agregado al plan el 2026-07-27.
+
+FUNDAMENTO: SQLAlchemy protege automaticamente contra inyeccion SQL en los VALORES de una consulta (genera consultas parametrizadas al usar filter, get, where). Pero la parametrizacion NO cubre las partes que no son valores: nombres de tabla, nombres de columna, y la direccion de un ORDER BY. No se puede vincular un nombre de columna como parametro. Si un usuario puede elegir la columna de ordenamiento, hace falta validacion por lista blanca: comparar contra un conjunto fijo de opciones validas y rechazar todo lo demas.
+
+QUE HACER:
+1. Auditar todos los endpoints que aceptan parametros de ordenamiento o filtrado por columna.
+2. Definir enums de Pydantic con las opciones validas.
+3. Test que confirme el rechazo de una columna no permitida.
+
+ESTADO DE LA AUDITORIA: no realizada. Primer paso de esta funcion. Si no existe ningun endpoint con ordenamiento controlado por el usuario, marcar como "no aplica todavia" y retomar cuando se agregue el primero (probablemente en Bloque C o D).
+
+> **PRIORIDAD AL RETOMAR BLOQUE B:** B6.3 (guardian anti-SQL crudo) y B6.4 (privilegios minimos de base de datos) ya estaban en el plan y siguen sin iniciar. Cubren el vector de ataque principal contra la base de datos, asi que van ANTES que las medidas nuevas.
+
 ## BLOQUE C - Motor de roadmaps
 
 CONGELADO. No se toca hasta que Bloque A este 100% cerrado.
@@ -207,6 +222,42 @@ Decisiones ya tomadas sobre el modelo real (para cuando lleguemos):
 - Resource YA EXISTE (cuelga de category_id) - se le agrega subtopic_id como FK adicional nullable, sin tocar category_id.
 - Project YA EXISTE (con repo_name/repo_url/status/checklist_items) - se le agregan titulo y pasos. checklist_items es tracking de progreso, distinto de "pasos" (instrucciones).
 - Topic es una capa intermedia real que el plan no anticipa; queda intacta, C1 no la usa.
+- PAGINACION OBLIGATORIA (agregado al plan 2026-07-27): Todo endpoint que devuelva una lista debe aceptar limit y offset, con un limite por defecto conservador y un MAXIMO ABSOLUTO que no se pueda superar aunque el cliente pida mas.
+
+FUNDAMENTO: el rate limiting de B3 limita cuantas peticiones se hacen, pero no cuanto devuelve cada una. Una sola consulta legitima que devuelva la tabla entera permite extraer toda la base de datos en pocas peticiones sin disparar ningun limite.
+
+Se implementa junto con el motor, no antes: hoy la base tiene 3 carreras y 0 fases, 0 topics, 0 subtopics. No hay nada que paginar.
+
+Criterio de cierre: ningun endpoint puede devolver la tabla completa en una sola respuesta. Test que confirme que pedir un limit mayor al maximo devuelve el maximo, no todo.
+
+## BLOQUE H - Despliegue
+
+CONGELADO. Se aborda despues de cerrar Bloque A.
+
+Ademas de lo que ya preveia el plan (HTTPS redirect de B5, tres capas de despliegue), se agregaron el 2026-07-27:
+
+### Copias de seguridad (NUEVO)
+
+NO INICIADO. El plan cubre bien la proteccion contra acceso no autorizado pero NO contempla la perdida de datos. Un borrado accidental, un fallo de disco o un ransomware causan perdida total y ninguna medida de B1-B6 lo previene.
+
+Que hacer:
+- Estrategia por capa: local (copia del archivo SQLite con rotacion), servidor propio (volcado periodico fuera del mismo disco), internet (volcado con almacenamiento externo).
+- Documentar el procedimiento de RESTAURACION. Una copia que nunca se probo no es una copia.
+- Archivos: deploy/backup.md, script de automatizacion, deploy/restore.md
+
+Criterio de cierre: copia automatica funcionando + al menos una restauracion completa realizada y verificada.
+
+### Advertencia de exposicion del nucleo (NUEVO)
+
+NO INICIADO. Documental, sin codigo.
+
+Bitacora nucleo NO tiene autenticacion. Cualquiera que alcance la URL puede leer y modificar todos los datos. Esto NO es una limitacion a corregir: es una decision de diseno (ver "DECISION: usuarios y perfiles" en la seccion de decisiones).
+
+Hay que documentarlo de forma visible en README.md, deploy/README.md y SECURITY.md:
+- Apta para: maquina personal, servidor privado, red local, VPN.
+- NO exponer a internet abierta sin una capa de autenticacion delante (proxy inverso con auth basica, o VPN).
+
+Criterio de cierre: la advertencia aparece en los tres lugares y es imposible pasarla por alto al leer las instrucciones de despliegue.
 
 ## DEUDA TECNICA GENERAL
 
@@ -217,11 +268,31 @@ Decisiones ya tomadas sobre el modelo real (para cuando lleguemos):
 - HALLAZGO (2026-07-27): static/js/labs.js contiene LABS_DATA hardcodeado con ~15 laboratorios de TryHackMe, Hack The Box y otras plataformas (nombres, descripciones, URLs de sus cursos). Mismo patron que el catalogo de roadmap.sh que se elimino en A2. PENDIENTE: revisar si redistribuir ese catalogo tiene problema de licencia, y si esos labs deberian venir de Scrapling (Bloque D) en vez de estar hardcodeados. No tocar hasta llegar a Bloque D o E.
 - HALLAZGO (2026-07-27): ARCHIVOS JS CORRUPTOS - static/data/seed.js:329, static/js/roadmapApi.js:318 y static/js/messages.js:233 tenian errores de sintaxis que impedian que los archivos cargaran (llave sobrante, string sin cerrar, fragmento SVG duplicado). Preexistentes, no introducidos por A1/A2. Dos de ellos se danaron en el commit 69b77a9f 'recombine split files' — revisar tools/recombine.py como posible causa raiz (lee chunks en modo texto, no binario, lo que corrompe los limites entre partes en Windows). LECCION: correr 'node --check' sobre todos los .js del frontend como verificacion de rutina, igual que pytest para el backend. Los errores de sintaxis en JS no aparecen en pytest y solo se ven en la consola del navegador.
 DESINCRONIZACION FRONTEND/BACKEND (descubierto 2026-07-27): roadmapApi.js llama a GET /api/roadmaps/topics y /subtopics (planos, sin ID) que dan 404. Esos endpoints se crearon en la rama 'Sprint 3' (commit fbf21d0) que NUNCA se mergeo a main; el roadmapApi.js del frontend si llego a main. El backend actual solo tiene endpoints anidados (/phases/{id}/topics). Sortable (drag-and-drop, usado en roadmap.js:621,636,651) nunca estuvo en index.html en ningun commit - nunca se cargo. NO se arregla ahora: la base de datos esta vacia (0 fases, 0 topics, 0 subtopics) porque el motor de roadmaps es Bloque C, congelado. Decidir en Bloque C: crear los endpoints planos, o que el frontend use los datos anidados que PhaseResponse ya devuelve. Y decidir si Sortable se incorpora (si viene de CDN, chocara con la CSP de A1).
+- Bitacora carga fuentes desde Google Fonts (fonts.googleapis.com y fonts.gstatic.com). Eso significa que cada usuario que abre la app le informa a Google que la abrio. Para una herramienta de aprendizaje personal vale la pena considerar alojar las fuentes localmente (descargarlas a static/fonts/), lo que ademas simplificaria la CSP a 'self' puro. Pendiente, no urgente.
 
 ## IDEAS PARA BLOQUES FUTUROS (no implementar todavia)
 
 - Importar actualizando/mergeando una carrera existente. Razones para no implementar: borrar carrera por coincidencia de titulo es destructivo y silencioso (usuario pierde progreso sin avisar); mergear es complejo y ambiguo (que pasa si usuario borro un topic en el MD nuevo). Crear siempre nueva es predecible y seguro.
 - Seccion "Premium recomendados" en Resource: agregar campo es_premium (boolean, default false). Diferencia de los recursos gratuitos de scraping. Candidato de ejemplo: kodekloud.com.
+
+## DECISIONES
+
+### DECISION: usuarios y perfiles (2026-07-27)
+
+El nucleo de Bitacora NO tendra sistema de usuarios, login ni perfiles.
+
+Bitacora nucleo es una aplicacion personal: corre en la maquina del usuario o en su servidor privado, con su propia clave de IA en su propio navegador (modo self-host, A1). Quien abre la aplicacion es su dueno.
+
+RAZONES:
+1. Coherencia: todo el diseno de A1 (clave en el navegador del usuario, sin servidor central, sin dependencia del desarrollador) parte de que la aplicacion es personal. Cuentas contradicen ese modelo.
+2. Es lo que hace vendible a Pro: el sistema de cuentas, roles y aulas es la razon de ser del modulo comercial. Si el nucleo ya lo incluye, cualquiera construye la capa docente encima con el mismo trabajo.
+3. Alcance: usuarios, sesiones, permisos, recuperacion de cuenta y auditoria es un bloque completo. Bloque A todavia no esta cerrado.
+
+DONDE VA: en Bitacora Pro (modulo educativo comercial), cuando se construya.
+
+RECOMENDACION REGISTRADA PARA ESE MOMENTO: evaluar un servicio de identidad existente (Auth0, Clerk, Supabase Auth, WorkOS) en vez de construir la autenticacion a mano. Los errores en OAuth y OpenID Connect se convierten en fallos de robo de cuenta; no es terreno para construir sin experiencia previa.
+
+CONSECUENCIA INMEDIATA: el nucleo no debe exponerse a internet abierta. Ver "Advertencia de exposicion del nucleo" en Bloque H.
 
 # BITÁCORA — Bloque A: Sanear la base
 ## Documento de especificación milimétrica (el plano exacto)

@@ -49,6 +49,21 @@ async def security_headers_middleware(request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+
+    # CSP Report-Only (A1) — reporta en la consola del navegador qué se bloquearía,
+    # pero no bloquea nada. Cambiar a Content-Security-Policy tras verificar consola limpia.
+    response.headers["Content-Security-Policy-Report-Only"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'"
+    )
     return response
 
 # CORS — allow frontend origin
