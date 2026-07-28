@@ -315,7 +315,7 @@ const RoadmapAPI = (function () {
 
   async function addSubtopicResource(subtopicId, data) {
     const result = await post(`/subtopics/${subtopicId}/resources`, data);
-    invalidateCache('roadmap
+        invalidateCache('roadmap');
     return result;
   }
 

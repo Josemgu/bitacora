@@ -215,6 +215,8 @@ Decisiones ya tomadas sobre el modelo real (para cuando lleguemos):
 - Alias Roadmap = Career en base.py - temporal, eliminar tras limpiar frontend.
 - tools/recombine.py es un script utilitario para recombinar archivos .partNNN (no del plan). docs/superpowers/ y docs/images/ son assets documentales. static/data/seed.js es el seed de datos iniciales del frontend (usa esquema antiguo: phase_id, soporta UNA sola carrera). Ver analisis completo en A3 o seccion de seed.
 - HALLAZGO (2026-07-27): static/js/labs.js contiene LABS_DATA hardcodeado con ~15 laboratorios de TryHackMe, Hack The Box y otras plataformas (nombres, descripciones, URLs de sus cursos). Mismo patron que el catalogo de roadmap.sh que se elimino en A2. PENDIENTE: revisar si redistribuir ese catalogo tiene problema de licencia, y si esos labs deberian venir de Scrapling (Bloque D) en vez de estar hardcodeados. No tocar hasta llegar a Bloque D o E.
+- HALLAZGO (2026-07-27): ARCHIVOS JS CORRUPTOS - static/data/seed.js:329, static/js/roadmapApi.js:318 y static/js/messages.js:233 tenian errores de sintaxis que impedian que los archivos cargaran (llave sobrante, string sin cerrar, fragmento SVG duplicado). Preexistentes, no introducidos por A1/A2. Dos de ellos se danaron en el commit 69b77a9f 'recombine split files' — revisar tools/recombine.py como posible causa raiz (lee chunks en modo texto, no binario, lo que corrompe los limites entre partes en Windows). LECCION: correr 'node --check' sobre todos los .js del frontend como verificacion de rutina, igual que pytest para el backend. Los errores de sintaxis en JS no aparecen en pytest y solo se ven en la consola del navegador.
+- FRONTEND PIDE ENDPOINTS QUE NO EXISTEN (descubierto 2026-07-27): roadmapApi.js llama a GET /api/roadmaps/topics y GET /api/roadmaps/subtopics (planos, sin ID) y ambos dan 404. Los endpoints anidados SI existen (/phases/{id}/topics, /topics/{id}/subtopics). El error estaba oculto porque roadmapApi.js tenia un error de sintaxis y no cargaba. CAUSA: roadmapApi.js viene del commit fbf21d0 (Sprint 3) que NUNCA se mergeo a HEAD; Sprint 3 agrego esos endpoints en el backend, pero el backend actual solo tiene los endpoints anidados. NO se arregla ahora: la base de datos esta vacia (0 fases, 0 topics, 0 subtopics) porque el motor de roadmaps es Bloque C, que esta congelado. Decidir en Bloque C si se crean esos endpoints o si el frontend debe usar los datos anidados que PhaseResponse ya devuelve. Ademas: Sortable (libreria de drag-and-drop) no esta cargada en index.html, causando ReferenceError en roadmap.js:621. Nunca estuvo en index.html (ni CDN ni local). Verificar si venia de un CDN - si es asi, es relevante para la CSP de A1 (script-src 'self' bloquearia CDNs externos).
 
 ## IDEAS PARA BLOQUES FUTUROS (no implementar todavia)
 
@@ -401,9 +403,17 @@ si la clave se filtra.
 
 Al terminar, actualiza 00-START-HERE.md con lo que hiciste y lo que quedó pendiente.
 ```
-
 ## A1.5 Criterio de cierre
-El test `test_keys_selfhost.py` pasa en verde: en self-host, la clave del usuario no está en DB ni en logs. Los dos modos funcionan según `BITACORA_MODE`.
+El test 	ests/test_keys_selfhost.py pasa en verde: en self-host, la clave del usuario no esta en DB ni en logs. Los dos modos funcionan segun BITACORA_MODE.
+
+
+## A1.6 Limites conocidos del cifrado cliente (verificado 2026-07-27)
+
+Un CryptoKey no-extraible en IndexedDB impide que un XSS EXFILTRE el material de la clave (exportKey lanza InvalidAccessError). NO impide que un XSS activo USE la clave para descifrar mientras la vctima tiene la pestaa abierta. Por eso CSP es obligatoria como segunda capa, no opcional.
+
+Ademas: las CryptoKeys en IndexedDB NO estan ligadas criptograficamente al perfil del navegador - copiando los archivos de IndexedDB a otra maquina, la clave sigue funcionando. Protege contra XSS, no contra acceso fsico al disco. Documentado a partir de draft-ietf-oauth-browser-based-apps-26 seccion 6.3.4.2.2.
+
+**ROTACION DE CLAVES (pendiente, A1):** el registro de IndexedDB se llama "encryption_v1" para permitir rotacion futura, pero los datos cifrados NO guardan con que version de clave fueron cifrados. La practica estandar (NIST SP 800-57) es almacenar el identificador de version junto al ciphertext, para poder descifrar datos viejos con la clave vieja mientras se cifra lo nuevo con la nueva. Si algun dia se implementa rotacion real, hay que agregar ese campo al formato de api_key_encrypted.
 
 ---
 
